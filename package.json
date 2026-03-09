@@ -1,7 +1,7 @@
 {
   "name": "zerion-cli",
   "version": "0.1.0",
-  "description": "Zerion for AI developers: hosted MCP docs, wallet-analysis skill, and a JSON-first CLI.",
+  "description": "Zerion for AI agents and developers: hosted MCP docs, wallet-analysis skill, and a JSON-first CLI.",
   "type": "module",
   "bin": {
     "zerion-cli": "./cli/zerion-cli.js"

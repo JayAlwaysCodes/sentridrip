@@ -2,7 +2,7 @@
 
 **Maintained by Zerion.**
 
-`zerion-ai` is the public, self-contained repo for using Zerion from AI systems.
+`zerion-ai` is the public, self-contained repo for using Zerion from AI agents and developer tools.
 
 It packages two first-class integration paths:
 
