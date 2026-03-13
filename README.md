@@ -17,7 +17,24 @@ It also ships one flagship workflow:
 
 ## 1. Choose your authentication method
 
-### Option A: x402 Pay-per-call (Recommended for agents)
+### Option A: API Key
+
+Get an API key and export it: [Get your API key](https://dashboard.zerion.io)
+
+```bash
+export ZERION_API_KEY="zk_dev_..."
+```
+
+- API auth via **HTTP Basic Auth**
+- dev keys beginning with `zk_dev_`
+- current dev-key limits of **120 requests/minute** and **5k requests/day**
+
+Useful docs:
+
+- [Build with AI](https://developers.zerion.io/reference/building-with-ai)
+- [Get Wallet Data With Zerion API](https://developers.zerion.io/reference/getting-started)
+
+### Option B: x402 Pay-per-call
 
 **No API key needed.** Pay $0.01 USDC per request on Base via the [x402 protocol](https://www.x402.org/). The CLI handles the payment handshake automatically using your wallet's private key.
 
@@ -39,19 +56,6 @@ Or enable x402 globally:
 export ZERION_X402=true
 zerion-cli wallet analyze 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
 ```
-
-### Option B: API Key
-
-Get an API key for higher rate limits and production use: [Get your API key](https://dashboard.zerion.io)
-
-- API auth via **HTTP Basic Auth**
-- dev keys beginning with `zk_dev_`
-- current dev-key limits of **120 requests/minute** and **5k requests/day**
-
-Useful docs:
-
-- [Build with AI](https://developers.zerion.io/reference/building-with-ai)
-- [Get Wallet Data With Zerion API](https://developers.zerion.io/reference/getting-started)
 
 ## 2. Choose your integration path
 
@@ -99,20 +103,20 @@ Start here:
 
 ### CLI quickstart
 
-**With x402 (no API key needed):**
-
-```bash
-npm install -g zerion-cli
-export WALLET_PRIVATE_KEY="0x..."
-zerion-cli wallet analyze 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 --x402
-```
-
 **With API key:**
 
 ```bash
 npm install -g zerion-cli
 export ZERION_API_KEY="zk_dev_..."
 zerion-cli wallet analyze 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+```
+
+**With x402 (no API key needed):**
+
+```bash
+npm install -g zerion-cli
+export WALLET_PRIVATE_KEY="0x..."
+zerion-cli wallet analyze 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 --x402
 ```
 
 Example output:
