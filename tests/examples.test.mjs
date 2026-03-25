@@ -82,7 +82,14 @@ describe("examples", () => {
 
     it("has valid Python syntax", () => {
       try {
-        execFileSync("python3", ["-m", "py_compile", join(ROOT, "examples/openai-agents/wallet_analysis.py")]);
+        execFileSync(
+          "python3",
+          [
+            "-c",
+            "import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_text())",
+            join(ROOT, "examples/openai-agents/wallet_analysis.py")
+          ]
+        );
       } catch (e) {
         // Skip if python3 is not available
         if (e.code === "ENOENT") {
