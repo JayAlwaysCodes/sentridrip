@@ -6,7 +6,7 @@ import { createPolicy, toCaip2, allChainNames } from "../../lib/wallet/keystore.
 import { shortenScriptPaths } from "../../lib/util/format.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const POLICIES_DIR = join(__dirname, "..", "policies");
+const POLICIES_DIR = join(__dirname, "..", "..", "policies");
 
 function parseExpires(input) {
   // Relative: 1h, 24h, 7d, 30d

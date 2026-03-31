@@ -53,8 +53,10 @@ export default async function walletDelete(args, flags) {
     // Verify passphrase is correct by attempting export
     try {
       ows.exportWallet(walletName, passphrase);
-    } catch {
-      printError("wrong_passphrase", "Incorrect passphrase");
+    } catch (err) {
+      const code = err.message?.includes("passphrase") || err.message?.includes("decrypt")
+        ? "wrong_passphrase" : "ows_error";
+      printError(code, code === "wrong_passphrase" ? "Incorrect passphrase" : err.message);
       process.exit(1);
     }
 

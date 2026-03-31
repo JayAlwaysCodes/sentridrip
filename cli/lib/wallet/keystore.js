@@ -112,8 +112,8 @@ export function revokeAgentToken(idOrName) {
   try {
     ows.revokeApiKey(idOrName);
     return;
-  } catch {
-    // Search by name
+  } catch (err) {
+    if (!err.message?.includes("not found")) throw err;
     const keys = ows.listApiKeys();
     const found = keys.find((k) => k.name === idOrName);
     if (!found) throw new Error(`Agent token "${idOrName}" not found`);
