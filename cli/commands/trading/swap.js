@@ -94,9 +94,16 @@ export default async function swap(args, flags) {
     };
     print(resultData, formatSwapQuote);
   } catch (err) {
-    printError(err.code || "swap_error", err.message, {
-      suggestion: err.suggestion,
-    });
+    // OWS returns "API key not found" for revoked/invalid agent tokens — clarify the message
+    if (process.env.ZERION_AGENT_TOKEN && err.message?.includes("API key not found")) {
+      printError("invalid_agent_token", "Agent token is revoked or invalid", {
+        suggestion: "Unset it (unset ZERION_AGENT_TOKEN) or create a new one (zerion-cli agent create-token)",
+      });
+    } else {
+      printError(err.code || "swap_error", err.message, {
+        suggestion: err.suggestion,
+      });
+    }
     process.exit(1);
   }
 }

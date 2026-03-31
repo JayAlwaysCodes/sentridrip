@@ -85,9 +85,15 @@ export default async function bridge(args, flags) {
       executed: true,
     });
   } catch (err) {
-    printError(err.code || "bridge_error", err.message, {
-      suggestion: err.suggestion,
-    });
+    if (process.env.ZERION_AGENT_TOKEN && err.message?.includes("API key not found")) {
+      printError("invalid_agent_token", "Agent token is revoked or invalid", {
+        suggestion: "Unset it (unset ZERION_AGENT_TOKEN) or create a new one (zerion-cli agent create-token)",
+      });
+    } else {
+      printError(err.code || "bridge_error", err.message, {
+        suggestion: err.suggestion,
+      });
+    }
     process.exit(1);
   }
 }
