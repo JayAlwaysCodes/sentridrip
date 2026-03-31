@@ -43,10 +43,9 @@ export async function signSwapTransaction(swapTx, zerionChainId, walletName, pas
     client.estimateFeesPerGas(),
   ]);
 
-  // Parse values from Zerion API response (may be hex strings or numbers)
-  const chainId = swapTx.chain_id
-    ? parseInt(swapTx.chain_id, 16) || getViemChain(zerionChainId).id
-    : getViemChain(zerionChainId).id;
+  // Parse chain ID from Zerion API response — may be hex string ("0x2105"), decimal string ("8453"), or number
+  // Always prefer our known chain ID from the --chain flag to avoid mismatches
+  const chainId = getViemChain(zerionChainId).id;
 
   const tx = {
     type: "eip1559",
