@@ -36,7 +36,7 @@ describe("CLI routing", () => {
       const json = parseJSON(stdout);
       assert.ok(json);
       assert.ok(json.usage);
-      assert.ok(json.commands);
+      assert.ok(json.wallet_management);
       assert.ok(json.flags);
     });
 
@@ -45,7 +45,7 @@ describe("CLI routing", () => {
       assert.equal(code, 0);
       const json = parseJSON(stdout);
       assert.ok(json);
-      assert.ok(json.commands);
+      assert.ok(json.wallet_management);
     });
 
     it("shows help with -h (exit 0)", async () => {
@@ -139,7 +139,7 @@ describe("CLI routing", () => {
       const json = parseJSON(stdout);
       assert.ok(json);
       assert.ok(json.usage);
-      assert.ok(json.commands);
+      assert.ok(json.wallet_management);
       assert.ok(json.flags);
     });
   });
