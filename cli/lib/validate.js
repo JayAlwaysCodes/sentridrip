@@ -2,22 +2,9 @@
  * Input validation for wallet read commands — chain IDs and position filters.
  */
 
-export const CHAIN_IDS = new Set([
-  "ethereum",
-  "base",
-  "arbitrum",
-  "optimism",
-  "polygon",
-  "bsc",
-  "avalanche",
-  "gnosis",
-  "scroll",
-  "linea",
-  "zksync",
-  "solana",
-  "zora",
-  "blast",
-]);
+import { SUPPORTED_CHAINS } from "./chains.js";
+
+export const CHAIN_IDS = new Set(SUPPORTED_CHAINS);
 
 export const POSITION_FILTERS = {
   all: "no_filter",

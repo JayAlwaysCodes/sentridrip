@@ -32,9 +32,3 @@ export function setPrettyMode(enabled) {
 export function isPrettyMode() {
   return _prettyMode;
 }
-
-export function resolveOutputMode(flags) {
-  if (flags.quiet) return "quiet";
-  if (flags.pretty) return "pretty";
-  return "json";
-}

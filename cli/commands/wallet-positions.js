@@ -5,14 +5,13 @@
 
 import * as api from "../lib/api-client.js";
 import { print, printError } from "../lib/output.js";
-import { resolveWallet, resolveAddress } from "../lib/resolve-wallet.js";
+import { resolveAddressOrWallet } from "../lib/resolve-wallet.js";
 import { validateChain, validatePositions, resolvePositionFilter } from "../lib/validate.js";
 import { isX402Enabled } from "../lib/x402.js";
 
 export default async function walletPositions(args, flags) {
   const useX402 = flags.x402 === true || isX402Enabled();
 
-  // Validate inputs
   const chainErr = validateChain(flags.chain);
   if (chainErr) {
     printError(chainErr.code, chainErr.message, { supportedChains: chainErr.supportedChains });
@@ -25,19 +24,7 @@ export default async function walletPositions(args, flags) {
     process.exit(1);
   }
 
-  // Resolve address from positional arg or flags
-  let walletName, address;
-  if (args[0] && (args[0].startsWith("0x") || args[0].endsWith(".eth"))) {
-    address = await resolveAddress(args[0]);
-    walletName = args[0];
-  } else {
-    const resolved = resolveWallet(flags, args);
-    walletName = resolved.walletName;
-    address = resolved.address;
-    if (resolved.needsResolve) {
-      address = await resolveAddress(address);
-    }
-  }
+  const { walletName, address } = await resolveAddressOrWallet(args, flags);
 
   try {
     const response = await api.getPositions(address, {

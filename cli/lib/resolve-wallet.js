@@ -10,9 +10,12 @@ import { isSolana } from "./chains.js";
 import { printError } from "./output.js";
 import { resolveWatchAddress } from "./watchlist.js";
 
-const ensClient = createPublicClient({ chain: mainnet, transport: http() });
+let ensClient = null;
 
 async function resolveEns(name) {
+  if (!ensClient) {
+    ensClient = createPublicClient({ chain: mainnet, transport: http() });
+  }
   return ensClient.getEnsAddress({ name });
 }
 
@@ -66,4 +69,21 @@ export function resolveWallet(flags, args = []) {
     });
     process.exit(1);
   }
+}
+
+/**
+ * Resolve address from positional arg or --wallet/--address/--watch flags.
+ * Supports both `wallet portfolio <addr>` and `portfolio --wallet <name>`.
+ */
+export async function resolveAddressOrWallet(args, flags) {
+  if (args[0] && (args[0].startsWith("0x") || args[0].endsWith(".eth"))) {
+    const address = await resolveAddress(args[0]);
+    return { walletName: args[0], address };
+  }
+  const resolved = resolveWallet(flags, args);
+  let address = resolved.address;
+  if (resolved.needsResolve) {
+    address = await resolveAddress(address);
+  }
+  return { walletName: resolved.walletName, address };
 }

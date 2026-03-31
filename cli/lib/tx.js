@@ -16,8 +16,6 @@ const ERC20_APPROVE_ABI = parseAbi([
   "function approve(address spender, uint256 amount) returns (bool)",
 ]);
 
-const MAX_UINT256 = 2n ** 256n - 1n;
-
 /**
  * Get a viem public client for a Zerion chain ID.
  */

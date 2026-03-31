@@ -1,25 +1,12 @@
 import * as api from "../lib/api-client.js";
 import { print, printError } from "../lib/output.js";
-import { resolveWallet, resolveAddress } from "../lib/resolve-wallet.js";
+import { resolveAddressOrWallet } from "../lib/resolve-wallet.js";
 import { formatPortfolio } from "../lib/format.js";
 import { isX402Enabled } from "../lib/x402.js";
 
 export default async function portfolio(args, flags) {
   const useX402 = flags.x402 === true || isX402Enabled();
-
-  // Support both positional address (wallet portfolio <addr>) and --wallet/--address flags
-  let walletName, address;
-  if (args[0] && (args[0].startsWith("0x") || args[0].endsWith(".eth"))) {
-    address = await resolveAddress(args[0]);
-    walletName = args[0];
-  } else {
-    const resolved = resolveWallet(flags, args);
-    walletName = resolved.walletName;
-    address = resolved.address;
-    if (resolved.needsResolve) {
-      address = await resolveAddress(address);
-    }
-  }
+  const { walletName, address } = await resolveAddressOrWallet(args, flags);
 
   try {
     const [portfolioRes, positionsRes] = await Promise.all([

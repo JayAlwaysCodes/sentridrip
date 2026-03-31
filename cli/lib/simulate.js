@@ -10,6 +10,7 @@
  */
 
 import { getApiKey, getConfigValue } from "./config.js";
+import { basicAuthHeader } from "./api-client.js";
 
 function getSimulationEndpoint() {
   return (
@@ -54,7 +55,7 @@ async function simulateViaBlockaid(endpoint, transaction, chainId) {
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
-      Authorization: `Basic ${Buffer.from(`${apiKey}:`).toString("base64")}`,
+      Authorization: basicAuthHeader(apiKey),
     },
     body: JSON.stringify({
       chain_id: chainId,

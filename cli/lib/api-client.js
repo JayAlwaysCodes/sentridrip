@@ -11,16 +11,14 @@ export function basicAuthHeader(key) {
 }
 
 export async function fetchAPI(pathname, params = {}, useX402 = false) {
-  if (!useX402) {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      const err = new Error(
-        "ZERION_API_KEY is required. Get one at https://developers.zerion.io\n" +
-        "Alternatively, use --x402 for pay-per-call (no API key needed)."
-      );
-      err.code = "missing_api_key";
-      throw err;
-    }
+  const apiKey = useX402 ? null : getApiKey();
+  if (!useX402 && !apiKey) {
+    const err = new Error(
+      "ZERION_API_KEY is required. Get one at https://developers.zerion.io\n" +
+      "Alternatively, use --x402 for pay-per-call (no API key needed)."
+    );
+    err.code = "missing_api_key";
+    throw err;
   }
 
   const url = new URL(`${API_BASE}${pathname}`);
@@ -32,7 +30,7 @@ export async function fetchAPI(pathname, params = {}, useX402 = false) {
   const headers = { Accept: "application/json" };
 
   if (!useX402) {
-    headers.Authorization = basicAuthHeader(getApiKey());
+    headers.Authorization = basicAuthHeader(apiKey);
   }
 
   const fetchFn = useX402 ? await getX402Fetch() : fetch;
