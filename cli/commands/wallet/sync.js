@@ -2,7 +2,7 @@ import * as ows from "../../lib/wallet/keystore.js";
 import { print, printError, isPrettyMode } from "../../lib/util/output.js";
 import { getConfigValue } from "../../lib/config.js";
 
-export default async function exportCmd(args, flags) {
+export default async function walletSync(args, flags) {
   try {
     let wallets;
 
@@ -81,7 +81,7 @@ export default async function exportCmd(args, flags) {
       print(data);
     }
   } catch (err) {
-    printError("export_error", `Failed to export: ${err.message}`);
+    printError("sync_error", `Failed to sync: ${err.message}`);
     process.exit(1);
   }
 }

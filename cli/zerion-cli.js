@@ -39,6 +39,7 @@ import positions from "./commands/analytics/positions.js";
 import portfolio from "./commands/analytics/portfolio.js";
 import pnl from "./commands/analytics/pnl.js";
 import history from "./commands/analytics/history.js";
+import analyze from "./commands/analytics/activity.js";
 register("wallet", "analyze", walletOverview);
 register("wallet", "portfolio", portfolio);
 register("wallet", "positions", positions);
@@ -48,6 +49,7 @@ registerSingle("portfolio", portfolio);
 registerSingle("positions", positions);
 registerSingle("pnl", pnl);
 registerSingle("history", history);
+registerSingle("analyze", analyze);
 
 // --- Trading (swap, bridge, search, chains) ---
 
@@ -63,26 +65,18 @@ registerSingle("search", search);
 registerSingle("chains", chainsCmd);
 register("chains", "list", chainsCmd);
 
-// --- Watchlist analysis ---
-
-import analyze from "./commands/analytics/activity.js";
-registerSingle("analyze", analyze);
-
-// --- Agent tokens ---
+// --- Agent (tokens and policies) ---
 
 import agentCreateToken from "./commands/agent/create-token.js";
 import agentListTokens from "./commands/agent/list-tokens.js";
 import agentRevokeToken from "./commands/agent/revoke-token.js";
-register("agent", "create-token", agentCreateToken);
-register("agent", "list-tokens", agentListTokens);
-register("agent", "revoke-token", agentRevokeToken);
-
-// --- Agent policies ---
-
 import agentCreatePolicy from "./commands/agent/create-policy.js";
 import agentListPolicies from "./commands/agent/list-policies.js";
 import agentShowPolicy from "./commands/agent/show-policy.js";
 import agentDeletePolicy from "./commands/agent/delete-policy.js";
+register("agent", "create-token", agentCreateToken);
+register("agent", "list-tokens", agentListTokens);
+register("agent", "revoke-token", agentRevokeToken);
 register("agent", "create-policy", agentCreatePolicy);
 register("agent", "list-policies", agentListPolicies);
 register("agent", "show-policy", agentShowPolicy);

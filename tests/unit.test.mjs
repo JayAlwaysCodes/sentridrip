@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { parseFlags } from "../cli/lib/util/flags.js";
 import { basicAuthHeader } from "../cli/lib/api/client.js";
 import { validateChain, validatePositions, resolvePositionFilter, CHAIN_IDS, POSITION_FILTERS } from "../cli/lib/util/validate.js";
-import { summarizeAnalyze } from "../cli/lib/analyze.js";
+import { summarizeAnalyze } from "../cli/lib/util/analyze.js";
 
 describe("parseFlags", () => {
   it("returns empty rest and flags for empty argv", () => {

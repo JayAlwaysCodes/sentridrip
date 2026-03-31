@@ -4,7 +4,7 @@
  */
 
 import { fetchAPI } from "../../lib/api/client.js";
-import { summarizeAnalyze } from "../../lib/analyze.js";
+import { summarizeAnalyze } from "../../lib/util/analyze.js";
 import { print, printError } from "../../lib/util/output.js";
 import { isX402Enabled } from "../../lib/api/x402.js";
 

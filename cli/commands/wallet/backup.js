@@ -3,10 +3,10 @@ import { printError } from "../../lib/util/output.js";
 import { getConfigValue } from "../../lib/config.js";
 import { readPassphrase } from "../../lib/util/prompt.js";
 
-export default async function walletExport(args, flags) {
-  // Block export when running as an agent — agents should never access the mnemonic
+export default async function walletBackup(args, flags) {
+  // Block backup when running as an agent — agents should never access the mnemonic
   if (process.env.ZERION_AGENT_TOKEN) {
-    printError("agent_blocked", "wallet export is not available in agent mode", {
+    printError("agent_blocked", "wallet backup is not available in agent mode", {
       suggestion: "Agents use scoped tokens, not raw keys. See: zerion agent create-token",
     });
     process.exit(1);
@@ -14,7 +14,7 @@ export default async function walletExport(args, flags) {
 
   // Require interactive terminal — prevents silent scripted extraction
   if (!process.stdin.isTTY) {
-    printError("tty_required", "wallet export requires an interactive terminal", {
+    printError("tty_required", "wallet backup requires an interactive terminal", {
       suggestion: "Run this command directly in your terminal, not from a script or pipe",
     });
     process.exit(1);
@@ -49,7 +49,7 @@ export default async function walletExport(args, flags) {
     process.stderr.write(`  ${mnemonic}\n\n`);
     process.stderr.write("  ⚠️  Write this down and store it offline. It will not be shown again.\n\n");
   } catch (err) {
-    printError("ows_error", `Failed to export wallet: ${err.message}`, {
+    printError("ows_error", `Failed to backup wallet: ${err.message}`, {
       suggestion: "Check wallet name and passphrase. List wallets: zerion wallet list",
     });
     process.exit(1);

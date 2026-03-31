@@ -70,6 +70,7 @@ function printUsage() {
       "config set <key> <value>": "Set config (apiKey, defaultWallet, defaultChain, slippage)",
       "config list": "Show current configuration",
       "portfolio": "Portfolio (shorthand, uses --wallet or default)",
+      "positions": "Positions (shorthand, uses --wallet or default)",
       "pnl": "PnL (shorthand, uses --wallet or default)",
       "history": "Tx history (shorthand, uses --wallet or default)",
     },
