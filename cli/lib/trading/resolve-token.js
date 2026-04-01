@@ -53,15 +53,15 @@ export async function resolveToken(query, chainId) {
   }
 
   // Prefer verified tokens
-  const verified = results.find((r) => r.attributes.flags?.verified);
+  const verified = results.find((r) => r.attributes?.flags?.verified);
   const best = verified || results[0];
 
-  const impl = best.attributes.implementations?.[0];
+  const impl = best.attributes?.implementations?.[0];
 
   return {
     fungibleId: best.id,
-    symbol: best.attributes.symbol,
-    name: best.attributes.name,
+    symbol: best.attributes?.symbol,
+    name: best.attributes?.name,
     decimals: impl?.decimals ?? 18,
     address: impl?.address,
   };

@@ -34,7 +34,10 @@ export async function fetchAPI(pathname, params = {}, useX402 = false) {
   }
 
   const fetchFn = useX402 ? await getX402Fetch() : fetch;
-  const response = await fetchFn(url, { headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  const response = await fetchFn(url, { headers, signal: controller.signal });
+  clearTimeout(timer);
 
   const text = await response.text();
   let payload;
@@ -60,7 +63,7 @@ export async function fetchAPI(pathname, params = {}, useX402 = false) {
 // --- Wallet endpoints ---
 
 export async function getPortfolio(address, options = {}) {
-  return fetchAPI(`/wallets/${address}/portfolio`, {
+  return fetchAPI(`/wallets/${encodeURIComponent(address)}/portfolio`, {
     currency: options.currency || "usd",
   }, options.useX402);
 }
@@ -72,11 +75,11 @@ export async function getPositions(address, options = {}) {
     sort: "value",
   };
   if (options.chainId) params["filter[chain_ids]"] = options.chainId;
-  return fetchAPI(`/wallets/${address}/positions/`, params, options.useX402);
+  return fetchAPI(`/wallets/${encodeURIComponent(address)}/positions/`, params, options.useX402);
 }
 
 export async function getPnl(address, options = {}) {
-  return fetchAPI(`/wallets/${address}/pnl`, {}, options.useX402);
+  return fetchAPI(`/wallets/${encodeURIComponent(address)}/pnl`, {}, options.useX402);
 }
 
 export async function getTransactions(address, options = {}) {
@@ -85,7 +88,7 @@ export async function getTransactions(address, options = {}) {
     currency: "usd",
   };
   if (options.chainId) params["filter[chain_ids]"] = options.chainId;
-  return fetchAPI(`/wallets/${address}/transactions/`, params, options.useX402);
+  return fetchAPI(`/wallets/${encodeURIComponent(address)}/transactions/`, params, options.useX402);
 }
 
 // --- Fungibles endpoints ---

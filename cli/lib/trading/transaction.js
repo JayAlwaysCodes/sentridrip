@@ -84,7 +84,7 @@ export async function broadcastAndWait(client, signedTxHex) {
     serializedTransaction: signedTxHex,
   });
 
-  const receipt = await client.waitForTransactionReceipt({ hash });
+  const receipt = await client.waitForTransactionReceipt({ hash, timeout: 120_000 });
 
   return {
     hash,

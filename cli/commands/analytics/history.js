@@ -16,10 +16,10 @@ export default async function history(args, flags) {
     });
 
     const transactions = (response.data || []).map((tx) => ({
-      hash: tx.attributes.hash,
-      type: tx.attributes.operation_type,
-      status: tx.attributes.status,
-      timestamp: tx.attributes.mined_at,
+      hash: tx.attributes?.hash,
+      type: tx.attributes?.operation_type,
+      status: tx.attributes?.status,
+      timestamp: tx.attributes?.mined_at,
       chain: tx.relationships?.chain?.data?.id,
       fee: tx.attributes.fee?.value,
       transfers: (tx.attributes.transfers || []).map((t) => ({
