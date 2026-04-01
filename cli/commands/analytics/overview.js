@@ -7,6 +7,7 @@ import { fetchAPI } from "../../lib/api/client.js";
 import { summarizeAnalyze } from "../../lib/util/analyze.js";
 import { print, printError } from "../../lib/util/output.js";
 import { isX402Enabled } from "../../lib/api/x402.js";
+import { resolveAddress } from "../../lib/wallet/resolve.js";
 
 export default async function walletAnalyze(args, flags) {
   const address = args[0] || flags.address;
@@ -15,8 +16,9 @@ export default async function walletAnalyze(args, flags) {
     process.exit(1);
   }
 
+  const resolved = await resolveAddress(address);
   const useX402 = flags.x402 === true || isX402Enabled();
-  const addr = encodeURIComponent(address);
+  const addr = encodeURIComponent(resolved);
   const txLimit = flags.limit ? parseInt(flags.limit) : 10;
 
   const posParams = { "filter[positions]": "no_filter" };
@@ -42,7 +44,7 @@ export default async function walletAnalyze(args, flags) {
       .map((r, i) => (r.status === "rejected" ? labels[i] : null))
       .filter(Boolean);
 
-    const summary = summarizeAnalyze(address, ...values);
+    const summary = summarizeAnalyze(resolved, ...values);
     if (failures.length) summary.failures = failures;
     if (useX402) summary.auth = "x402";
 
