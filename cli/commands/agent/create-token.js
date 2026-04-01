@@ -1,6 +1,7 @@
 import * as ows from "../../lib/wallet/keystore.js";
 import { print, printError } from "../../lib/util/output.js";
 import { getConfigValue } from "../../lib/config.js";
+import { readPassphrase } from "../../lib/util/prompt.js";
 
 export default async function agentCreateToken(args, flags) {
   const name = flags.name || args[0];
@@ -20,8 +21,8 @@ export default async function agentCreateToken(args, flags) {
     process.exit(1);
   }
 
-  // Passphrase defaults to "" (wallets created without --passphrase use empty string)
-  const passphrase = typeof flags.passphrase === "string" ? flags.passphrase : "";
+  // Require interactive passphrase to prove wallet ownership — never accept via flag
+  const passphrase = await readPassphrase();
 
   // Resolve policy IDs
   const policyIds = flags.policy
@@ -45,7 +46,7 @@ export default async function agentCreateToken(args, flags) {
 
     process.stderr.write(
       "\n⚠️  Save this token now — it will NOT be shown again.\n" +
-      "   Use it as: ZERION_AGENT_TOKEN=" + result.token + " zerion swap ...\n\n"
+      "   Use it as: ZERION_AGENT_TOKEN=<token> zerion-cli swap ...\n\n"
     );
 
     print({

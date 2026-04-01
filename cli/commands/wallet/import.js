@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resolve, relative } from "node:path";
 import * as ows from "../../lib/wallet/keystore.js";
 import { print, printError } from "../../lib/util/output.js";
 import { setConfigValue, getConfigValue } from "../../lib/config.js";
@@ -6,7 +7,12 @@ import { readSecret, readPassphrase } from "../../lib/util/prompt.js";
 
 async function resolveSecretInput(flags, flagName, fileFlagName, prompt) {
   if (flags[fileFlagName]) {
-    return readFileSync(flags[fileFlagName], "utf-8").trim();
+    const filePath = resolve(flags[fileFlagName]);
+    const rel = relative(process.cwd(), filePath);
+    if (rel.startsWith("..") && filePath.startsWith("/etc") || filePath.startsWith("/proc")) {
+      throw new Error(`Refusing to read sensitive system path: ${filePath}`);
+    }
+    return readFileSync(filePath, "utf-8").trim();
   }
   if (typeof flags[flagName] === "string" && flags[flagName].length > 0) {
     process.stderr.write(

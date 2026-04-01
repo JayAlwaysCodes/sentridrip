@@ -8,10 +8,14 @@ const DEFAULTS = {
   defaultChain: DEFAULT_CHAIN,
 };
 
+let _configCache = null;
+
 export function loadConfig() {
+  if (_configCache) return _configCache;
   if (!existsSync(CONFIG_PATH)) return { ...DEFAULTS };
   try {
-    return { ...DEFAULTS, ...JSON.parse(readFileSync(CONFIG_PATH, "utf-8")) };
+    _configCache = { ...DEFAULTS, ...JSON.parse(readFileSync(CONFIG_PATH, "utf-8")) };
+    return _configCache;
   } catch {
     return { ...DEFAULTS };
   }
@@ -20,6 +24,7 @@ export function loadConfig() {
 export function saveConfig(config) {
   mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+  _configCache = config;
 }
 
 export function getConfigValue(key) {
