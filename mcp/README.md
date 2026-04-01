@@ -1,6 +1,6 @@
 # Zerion Hosted MCP
 
-This repo treats Zerion's hosted MCP as the primary interface for MCP-native agent environments.
+Use Zerion's hosted MCP as the primary interface for MCP-native agent environments.
 
 ## Endpoint
 
@@ -8,56 +8,26 @@ This repo treats Zerion's hosted MCP as the primary interface for MCP-native age
 https://developers.zerion.io/mcp
 ```
 
-## What to use it for
+## When to use
 
-Use the hosted MCP path when:
+Use the **hosted MCP** when your client supports MCP and the model should choose and call tools directly (Cursor, Claude, etc.).
 
-- your client already supports MCP
-- the model should choose and call tools directly
-- you want the fastest path for Cursor or Claude-style agent setups
-
-Use the CLI path when your environment expects shell commands returning JSON.
+Use the **CLI** when your environment expects shell commands returning JSON. See [cli/README.md](../cli/README.md).
 
 ## Authentication
 
-Two options:
+See the [root README](../README.md#1-choose-your-authentication-method) for full auth setup (API key or x402 pay-per-call).
 
-### Option 1: API Key
-
-1. Get a Zerion API key:
-   https://dashboard.zerion.io
-2. Export it:
-
-   ```bash
-   export ZERION_API_KEY="zk_dev_..."
-   ```
-
-3. Reuse it in the MCP client config.
-
-This repo's example configs assume an `Authorization: Bearer ...` header for the hosted MCP and standard Basic Auth for raw REST requests.
-
-### Option 2: x402 Pay-per-call
-
-No API key needed. Pay $0.01 USDC per request on Base via the [x402 protocol](https://www.x402.org/).
-
-```bash
-export WALLET_PRIVATE_KEY="0x..."   # EVM wallet with USDC on Base
-export ZERION_X402=true
-```
-
-The CLI signs the payment automatically using `@x402/fetch` and `@x402/evm`. Your wallet must hold USDC on Base.
-
-## Supported clients in this repo
+## Supported clients
 
 - Cursor: [examples/cursor](../examples/cursor/README.md)
-- Claude-compatible remote MCP clients: [examples/claude](../examples/claude/README.md)
+- Claude: [examples/claude](../examples/claude/README.md)
 
 ## Wallet-analysis walkthrough
 
 Use one of the example wallets:
 
-- `vitalik.eth`
-- `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`
+- `vitalik.eth` / `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`
 
 Then ask:
 
@@ -70,22 +40,13 @@ Analyze this wallet and summarize:
 - PnL
 ```
 
-The tool catalog in [`mcp/tools/`](./tools/) documents the concrete wallet capabilities used by the examples and CLI.
+The tool catalog in [`mcp/tools/`](./tools/) documents the concrete wallet capabilities.
 
 ## Failure modes
 
-Documented and expected:
-
-- missing or invalid API key
-- invalid address or ENS resolution failure
-- unsupported chain filters
-- rate limits
-- temporary upstream timeout
-- empty wallet or partially bootstrapped wallet state
-
-Relevant Zerion doc notes behind these behaviors:
-
-- wallet portfolio may require polling for fresh wallets
-- wallet positions may take time to bootstrap for some tokens
-- wallet transactions and positions accept many filters and pagination params
-- Solana support has endpoint-specific limitations
+- Missing or invalid API key
+- Invalid address or ENS resolution failure
+- Unsupported chain filters
+- Rate limits (429)
+- Upstream timeout or temporary unavailability
+- Empty or partially bootstrapped wallet state

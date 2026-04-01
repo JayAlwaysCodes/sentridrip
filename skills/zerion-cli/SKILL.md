@@ -141,9 +141,12 @@ zerion-cli wallet transactions <address>            # Transaction history
 zerion-cli wallet pnl <address>                     # Profit & loss
 ```
 
+Addresses can be `0x...` hex or ENS names (e.g., `vitalik.eth`).
+
 Shorthand (uses --wallet or default wallet instead of address):
 ```
 zerion-cli portfolio [--wallet <name>] [--address <addr>]
+zerion-cli positions [--wallet <name>] [--address <addr>]
 zerion-cli pnl [--wallet <name>] [--address <addr>]
 zerion-cli history [--wallet <name>] [--address <addr>]
 ```
