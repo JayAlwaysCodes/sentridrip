@@ -116,98 +116,160 @@ export ZERION_AGENT_TOKEN=ows_key_...
 
 ### Wallet management
 ```
-zerion-cli wallet create --name <name>              # Create encrypted wallet (EVM + Solana)
-zerion-cli wallet import --name <name> --key        # Import from private key (interactive)
-zerion-cli wallet import --name <name> --key-file <path>  # Import from file (safest)
-zerion-cli wallet import --name <name> --mnemonic   # Import from seed phrase
-zerion-cli wallet list                              # List all wallets
-zerion-cli wallet fund                              # Show deposit addresses
-zerion-cli wallet backup --wallet <name>            # Export recovery phrase (mnemonic)
-zerion-cli wallet delete <name>                     # Permanently delete a wallet
-zerion-cli wallet sync --wallet <name>              # Sync wallet to Zerion app via QR
-zerion-cli wallet sync --all                        # Sync all wallets to Zerion app
+zerion-cli wallet create --name <name>                        # Create encrypted wallet (EVM + Solana)
+zerion-cli wallet import --name <name> --key                  # Import from private key (interactive prompt)
+zerion-cli wallet import --name <name> --key-file <path>      # Import from file (safest)
+zerion-cli wallet import --name <name> --mnemonic             # Import from seed phrase (interactive prompt)
+zerion-cli wallet import --name <name> --mnemonic-file <path> # Import from mnemonic file
+zerion-cli wallet list                                        # List all wallets
+zerion-cli wallet list --limit <n>                            # Limit results (default: 20)
+zerion-cli wallet list --offset <n>                           # Skip first N (pagination)
+zerion-cli wallet list --search <query>                       # Filter by name or address
+zerion-cli wallet fund                                        # Show deposit addresses (uses default wallet)
+zerion-cli wallet fund --wallet <name>                        # Show deposit addresses for specific wallet
+zerion-cli wallet backup --wallet <name>                      # Export recovery phrase (mnemonic backup)
+zerion-cli wallet delete <name>                               # Permanently delete a wallet (requires passphrase)
+zerion-cli wallet sync --wallet <name>                        # Sync wallet to Zerion app via QR code
+zerion-cli wallet sync --all                                  # Sync all wallets to Zerion app
 ```
 
 ### Wallet analysis (read — supports --x402)
 ```
-zerion-cli wallet analyze <address>                 # Full analysis (parallel fetch)
-zerion-cli wallet portfolio <address>               # Portfolio value + positions
-zerion-cli wallet positions <address>               # Token + DeFi positions
-  --positions all|simple|defi                       #   Filter: all (default), simple, defi
-  --chain <chain>                                   #   Filter by chain
-zerion-cli wallet transactions <address>            # Transaction history
-  --limit <n>                                       #   Number of txs (default: 10)
-  --chain <chain>                                   #   Filter by chain
-zerion-cli wallet pnl <address>                     # Profit & loss
+zerion-cli wallet analyze <address>                           # Full analysis (portfolio, positions, txs, PnL in parallel)
+zerion-cli wallet analyze <address> --chain <chain>           # Filter by chain
+zerion-cli wallet analyze <address> --positions all|simple|defi  # Filter position type
+zerion-cli wallet analyze <address> --limit <n>               # Limit transactions (default: 10)
+zerion-cli wallet analyze <address> --x402                    # Use x402 pay-per-call
+zerion-cli wallet portfolio <address>                         # Portfolio value + top positions
+zerion-cli wallet positions <address>                         # Token + DeFi positions
+zerion-cli wallet positions <address> --positions all|simple|defi  # Filter: all (default), simple, defi
+zerion-cli wallet positions <address> --chain <chain>         # Filter by chain
+zerion-cli wallet transactions <address>                      # Transaction history
+zerion-cli wallet transactions <address> --limit <n>          # Number of txs (default: 10)
+zerion-cli wallet transactions <address> --chain <chain>      # Filter by chain
+zerion-cli wallet pnl <address>                               # Profit & loss (realized, unrealized, fees)
 ```
 
 Addresses can be `0x...` hex or ENS names (e.g., `vitalik.eth`).
 
 Shorthand (uses --wallet or default wallet instead of address):
 ```
-zerion-cli portfolio [--wallet <name>] [--address <addr>]
-zerion-cli positions [--wallet <name>] [--address <addr>]
-zerion-cli pnl [--wallet <name>] [--address <addr>]
-zerion-cli history [--wallet <name>] [--address <addr>]
+zerion-cli portfolio                                          # Portfolio (shorthand)
+zerion-cli portfolio --wallet <name>                          # Specific wallet
+zerion-cli portfolio --address <addr/ens>                     # Raw address or ENS
+zerion-cli portfolio --watch <name>                           # Watched wallet by name
+zerion-cli positions                                          # Positions (shorthand)
+zerion-cli positions --wallet <name>                          # Specific wallet
+zerion-cli pnl                                                # PnL (shorthand)
+zerion-cli pnl --wallet <name>                                # Specific wallet
+zerion-cli history                                            # Transaction history (shorthand)
+zerion-cli history --wallet <name>                            # Specific wallet
 ```
 
 ### Trading
 ```
-zerion-cli swap <from> <to> <amount>                # Quote
-zerion-cli swap <from> <to> <amount> --yes          # Execute
-zerion-cli swap <from> <to> <amount> --to-chain <chain> --yes  # Cross-chain
-zerion-cli bridge <token> <chain> <amount> --yes    # Bridge
-zerion-cli bridge <token> <chain> <amount> --to-token <tok> --yes  # Bridge + swap
-zerion-cli search <query>                           # Token search
-zerion-cli swap tokens [chain]                      # List swap-available tokens
-zerion-cli chains                                   # List supported chains
+zerion-cli swap <from> <to> <amount>                          # Get a quote (no execution)
+zerion-cli swap <from> <to> <amount> --yes                    # Execute the swap
+zerion-cli swap <from> <to> <amount> --chain <chain>          # Specify source chain
+zerion-cli swap <from> <to> <amount> --to-chain <chain>       # Cross-chain swap (quote)
+zerion-cli swap <from> <to> <amount> --to-chain <chain> --yes # Cross-chain swap (execute)
+zerion-cli swap <from> <to> <amount> --slippage <percent>     # Custom slippage tolerance
+zerion-cli swap <from> <to> <amount> --wallet <name> --yes    # Execute with specific wallet
+zerion-cli swap tokens                                        # List swap-available tokens (all chains)
+zerion-cli swap tokens <chain>                                # List swap-available tokens for chain
+zerion-cli bridge <token> <chain> <amount>                    # Bridge quote (no execution)
+zerion-cli bridge <token> <chain> <amount> --yes              # Execute bridge
+zerion-cli bridge <token> <chain> <amount> --from-chain <chain>  # Specify source chain
+zerion-cli bridge <token> <chain> <amount> --to-token <tok>   # Bridge + swap on destination (quote)
+zerion-cli bridge <token> <chain> <amount> --to-token <tok> --yes  # Bridge + swap (execute)
+zerion-cli search <query>                                     # Search for tokens by name, symbol, or address
+zerion-cli search <query> --chain <chain>                     # Search within a specific chain
+zerion-cli search <query> --limit <n>                         # Limit results (default: 10)
+zerion-cli chains                                             # List all supported chains
 ```
 
 ### Agent tokens
 ```
-zerion-cli agent create-token --name <bot> --wallet <wallet>
-zerion-cli agent list-tokens
-zerion-cli agent revoke-token --name <bot>
+zerion-cli agent create-token --name <bot> --wallet <wallet>  # Create scoped agent token
+zerion-cli agent create-token --name <bot> --wallet <wallet> --policy <id>  # With policy attached
+zerion-cli agent create-token --name <bot> --wallet <wallet> --policy <id1>,<id2>  # Multiple policies
+zerion-cli agent create-token --name <bot> --wallet <wallet> --expires 24h  # With expiry
+zerion-cli agent list-tokens                                  # List active agent tokens
+zerion-cli agent revoke-token --name <bot>                    # Revoke by name
+zerion-cli agent revoke-token --id <id>                       # Revoke by ID
 ```
+
+Usage: `export ZERION_AGENT_TOKEN=ows_key_...` to bypass passphrase prompts.
 
 ### Security policies
 ```
-zerion-cli agent create-policy --name <policy>
-  --chains base,arbitrum                            # Chain lock
-  --expires 24h | 7d                                # Expiry
-  --deny-transfers                                  # Block raw ETH transfers
-  --deny-approvals                                  # Block ERC-20 approvals
-  --allowlist 0xAddr1,0xAddr2                       # Allowlist-only
-zerion-cli agent list-policies
-zerion-cli agent show-policy <id>
-zerion-cli agent delete-policy <id>
+zerion-cli agent create-policy --name <policy>                # Create policy (at least one rule required)
+zerion-cli agent create-policy --name <policy> --chains base,arbitrum  # Chain lock
+zerion-cli agent create-policy --name <policy> --expires 24h  # Expiry (e.g. 24h, 7d)
+zerion-cli agent create-policy --name <policy> --deny-transfers  # Block raw ETH/native transfers
+zerion-cli agent create-policy --name <policy> --deny-approvals  # Block ERC-20 approval calls
+zerion-cli agent create-policy --name <policy> --allowlist 0xAddr1,0xAddr2  # Allowlist-only
+zerion-cli agent create-policy --name strict \
+  --chains base --expires 7d --deny-transfers --deny-approvals  # Combined rules
+zerion-cli agent list-policies                                # List all policies
+zerion-cli agent show-policy <id>                             # Show policy details
+zerion-cli agent delete-policy <id>                           # Delete a policy
 ```
 
 ### Watchlist & analysis
 ```
-zerion-cli watch <address> --name <label>           # Add to watchlist
-zerion-cli watch list                               # List watched wallets
-zerion-cli watch remove <name>                      # Remove
-zerion-cli analyze <name|address>                   # Analyze trading activity
+zerion-cli watch <address> --name <label>                     # Add wallet to watchlist (supports ENS)
+zerion-cli watch list                                         # List watched wallets
+zerion-cli watch remove <name>                                # Remove from watchlist
+zerion-cli analyze <name|address>                             # Analyze wallet trading activity
+zerion-cli analyze <name|address> --period 7d                 # Specify analysis period (e.g. 7d, 2w)
+zerion-cli analyze <name|address> --chain <chain>             # Filter by chain
 ```
 
 ### Config
 ```
-zerion-cli config set apiKey <key>                  # Set API key
-zerion-cli config set defaultWallet <name>          # Set default wallet
-zerion-cli config set defaultChain <chain>          # Set default chain
-zerion-cli config set slippage <percent>            # Set slippage (default: 2%)
-zerion-cli config list                              # Show current config
+zerion-cli config set apiKey <key>                            # Set API key
+zerion-cli config set defaultWallet <name>                    # Set default wallet
+zerion-cli config set defaultChain <chain>                    # Set default chain
+zerion-cli config set slippage <percent>                      # Set slippage tolerance (default: 2%)
+zerion-cli config get <key>                                   # Get a single config value
+zerion-cli config list                                        # Show current configuration
 ```
 
+### Other
+```
+zerion-cli --help                                             # Show full usage
+zerion-cli --version                                          # Show version
+```
+
+## Global flags
+
+| Flag | Description |
+|------|-------------|
+| `--wallet <name>` | Specify wallet (default: from config) |
+| `--address <addr/ens>` | Use raw address or ENS name |
+| `--watch <name>` | Use watched wallet by name |
+| `--chain <chain>` | Specify chain (default: ethereum) |
+| `--to-chain <chain>` | Destination chain for cross-chain swaps |
+| `--from-chain <chain>` | Source chain for bridge commands |
+| `--positions all\|simple\|defi` | Filter positions type |
+| `--limit <n>` | Limit results (transactions, wallet list; default: 20 for list) |
+| `--offset <n>` | Skip first N results (pagination for wallet list) |
+| `--search <query>` | Filter wallets by name or address |
+| `--slippage <percent>` | Slippage tolerance (default: 2%) |
+| `--x402` | Use x402 pay-per-call (no API key needed) |
+| `--json` | JSON output (default) |
+| `--pretty` | Human-readable output |
+| `--quiet` | Minimal output |
+| `--yes` | Skip confirmation prompts (required to execute trades) |
+
 ## Output modes
+
+All commands print JSON to stdout; errors are JSON on stderr with non-zero exit.
 
 - `--json` — JSON output (default, agent-friendly)
 - `--pretty` — Human-readable tables (auto-enabled for TTY)
 - `--quiet` — Minimal output
-- `--yes` — Skip confirmation prompts (required for trade execution)
-
-All outputs are JSON on stdout; errors are JSON on stderr.
 
 ## Supported chains
 
