@@ -39,163 +39,96 @@ Get yours at [dashboard.zerion.io](https://dashboard.zerion.io).
 Use this skill when the user asks about:
 - Swapping or trading tokens
 - Bridging tokens across chains
-- Creating or managing wallets
-- Backing up or syncing wallets
-- Setting up agent tokens for unattended trading
-- Configuring security policies (chain locks, allowlists, expiry)
+- Checking wallet balances before trading
+- Searching for tokens or listing available swap pairs
 
-## Wallet management
+For wallet creation, agent token setup, and policy configuration, tell the user to run those commands manually — they require interactive passphrase input.
 
-### Create a wallet
+## Agent operations — use these freely
 
-```bash
-zerion wallet create --name <name>
-```
+All commands below are fully automated. No passphrase or interactive input needed.
 
-Creates an OWS-encrypted wallet with both EVM and Solana addresses.
-
-### Import a wallet
+### Check wallets & policies before trading
 
 ```bash
-zerion wallet import --name <name> --evm-key    # EVM private key (interactive)
-zerion wallet import --name <name> --sol-key    # Solana private key (interactive)
-zerion wallet import --name <name> --mnemonic    # interactive mnemonic prompt
-
+zerion wallet list                       # Shows wallets, active policies, and addresses
+zerion agent list-tokens                 # Shows tokens with attached policies
+zerion agent list-policies               # List all policies with rules summary
 ```
-
-### List wallets
-
-```bash
-zerion wallet list
-```
-
-### Set default wallet
-
-```bash
-zerion config set defaultWallet <name>
-```
-
-## Trading
-
-All trading commands require an agent token (see below). No passphrase prompts.
 
 ### Swap tokens
 
 ```bash
-# Swap tokens
 zerion swap ETH USDC 0.1
-
-# Cross-chain swap (swap + bridge)
-zerion swap ETH USDC 0.1 --to-chain arbitrum
-
-# With timeout for slow bridges
-zerion swap ETH USDC 0.1 --to-chain arbitrum --timeout 300
+zerion swap ETH USDC 0.1 --chain base                    # Specify chain
+zerion swap ETH USDC 0.1 --to-chain arbitrum              # Cross-chain swap
+zerion swap ETH USDC 0.1 --to-chain arbitrum --timeout 300  # Slow bridge timeout
+zerion swap ETH USDC 0.1 --slippage 1                     # Custom slippage
+zerion swap ETH USDC 0.1 --wallet <name>                  # Use specific wallet
 ```
 
 ### Bridge tokens
 
 ```bash
-# Bridge ETH from Base to Arbitrum
 zerion bridge ETH arbitrum 0.1 --from-chain base
-
-# Bridge + swap (bridge ETH from Base to Arbitrum, receive USDC)
-zerion bridge ETH arbitrum 0.1 --from-chain base --to-token USDC
+zerion bridge ETH arbitrum 0.1 --from-chain base --to-token USDC  # Bridge + swap
 ```
 
 ### Send / transfer tokens
 
 ```bash
-# Send native token (ETH, BNB, etc.)
 zerion send ETH 0.01 --to 0x... --chain base
-
-# Send ERC-20 token
 zerion send USDC 10 --to 0x... --chain ethereum
 ```
 
-### Search tokens
+### Search & discover
 
 ```bash
 zerion search PEPE
 zerion search "uniswap" --chain ethereum
+zerion swap tokens ethereum               # List swap-available tokens
+zerion chains                             # List supported chains
 ```
 
-### List available swap tokens
+### Watchlist & analysis
 
 ```bash
-zerion swap tokens ethereum
+zerion watch list                         # List watched wallets
+zerion analyze <name|address>             # Analyze wallet trading activity
+zerion analyze <name|address> --period 7d
 ```
 
-## Agent tokens (required for trading)
+## Manual operations — human must run these
 
-Agent tokens are required for all trading commands (swap, bridge, send). A security policy is always required — if `--policy` is omitted, an interactive picker guides you through:
-1. **Tier** — Standard (deny transfers + expiry), Strict (+ chain restriction), or Custom
-2. **Expiry** — 7 days, 30 days, or no expiry
-3. **Chains** (Strict only) — checklist of allowed chains
+These commands require passphrase, confirmation, or interactive input. Agents should tell the user to run them directly.
+
+### Wallet setup
 
 ```bash
-# Create a token — interactive policy setup
-zerion agent create-token --name my-bot --wallet test-bot
-
-# Create with an existing policy (non-interactive)
-zerion agent create-token --name my-bot --wallet test-bot --policy <policy-id>
-
-# Or create wallet (includes token + policy setup at the end)
-zerion wallet create --name my-bot
-
-# List tokens
-zerion agent list-tokens
-
-# Revoke a token
-zerion agent revoke-token --name my-bot
+zerion wallet create --name <name>                        # Requires passphrase
+zerion wallet import --name <name> --evm-key              # Interactive key input
+zerion wallet import --name <name> --sol-key              # Interactive key input
+zerion wallet import --name <name> --mnemonic             # Interactive mnemonic prompt
+zerion wallet backup --wallet <name>                      # Requires passphrase
+zerion wallet delete <name>                               # Requires passphrase + confirmation
+zerion wallet sync --wallet <name>                        # Interactive QR code flow
 ```
 
-The token is read from config automatically. No environment variable needed.
-
-## Security policies
-
-Restrict what agent tokens can do:
+### Agent token & policy creation
 
 ```bash
-# Chain lock — only allow trading on specific chains
-zerion agent create-policy --name safe-trading --chains base,arbitrum
-
-# Expiry — token expires after time period
-zerion agent create-policy --name temp-access --expires 24h
-
-# Deny raw transfers
-zerion agent create-policy --name no-transfers --deny-transfers
-
-# Deny ERC-20 approvals
-zerion agent create-policy --name no-approvals --deny-approvals
-
-# Allowlist — only interact with specific addresses
-zerion agent create-policy --name dex-only --allowlist 0xRouter1,0xRouter2
-
-# Combine multiple rules
-zerion agent create-policy --name strict \
-  --chains base --expires 7d --deny-transfers --deny-approvals
-
-# List / show / delete policies
-zerion agent list-policies
-zerion agent show-policy <id>
+zerion agent create-token --name <bot> --wallet <wallet>  # Requires passphrase + policy picker
+zerion agent create-policy --name <policy> --chains base,arbitrum --deny-transfers --expires 7d
+zerion agent revoke-token --name <bot>
 zerion agent delete-policy <id>
 ```
 
-## Watchlist and analysis
+### Config changes
 
 ```bash
-zerion watch 0xd8dA... --name vitalik
-zerion watch list
-zerion analyze vitalik
-zerion watch remove vitalik
-```
-
-## Wallet backup & sync
-
-```bash
-zerion wallet backup --wallet test-bot   # Export recovery phrase (mnemonic)
-zerion wallet sync --wallet test-bot     # QR code to sync with Zerion iOS app
-zerion wallet sync --all                 # Sync all wallets
+zerion config set defaultWallet <name>
+zerion config set defaultChain <chain>
+zerion config set slippage <percent>
 ```
 
 ## Output modes

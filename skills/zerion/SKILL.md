@@ -118,25 +118,33 @@ zerion wallet create --name my-bot
 
 ## All commands
 
-### Wallet management
+Commands are split into two categories:
+
+- **Agent operations** — fully automated, no interactive input. Agents should use these freely.
+- **Manual operations** — require passphrase, confirmation, or interactive input. Humans must run these directly.
+
+### Agent operations — trading
+
+All trading commands require an agent token (set up once via manual commands below). No passphrase prompts.
+
 ```
-zerion wallet create --name <name>                        # Create encrypted wallet (EVM + Solana)
-zerion wallet import --name <name> --evm-key              # Import from EVM private key (interactive)
-zerion wallet import --name <name> --sol-key              # Import from Solana private key (interactive)
-zerion wallet import --name <name> --mnemonic             # Import from seed phrase (interactive prompt)
-zerion wallet list                                        # List all wallets
-zerion wallet list --limit <n>                            # Limit results (default: 20)
-zerion wallet list --offset <n>                           # Skip first N (pagination)
-zerion wallet list --search <query>                       # Filter by name or address
-zerion wallet fund                                        # Show deposit addresses (uses default wallet)
-zerion wallet fund --wallet <name>                        # Show deposit addresses for specific wallet
-zerion wallet backup --wallet <name>                      # Export recovery phrase (mnemonic backup)
-zerion wallet delete <name>                               # Permanently delete a wallet (requires passphrase)
-zerion wallet sync --wallet <name>                        # Sync wallet to Zerion app via QR code
-zerion wallet sync --all                                  # Sync all wallets to Zerion app
+zerion swap <from> <to> <amount>                          # Swap tokens
+zerion swap <from> <to> <amount> --chain <chain>          # Specify source chain
+zerion swap <from> <to> <amount> --to-chain <chain>       # Cross-chain swap
+zerion swap <from> <to> <amount> --slippage <percent>     # Custom slippage tolerance
+zerion swap <from> <to> <amount> --wallet <name>          # Use specific wallet
+zerion swap tokens                                        # List swap-available tokens (all chains)
+zerion swap tokens <chain>                                # List swap-available tokens for chain
+zerion bridge <token> <chain> <amount> --from-chain <chain>  # Bridge tokens cross-chain
+zerion bridge <token> <chain> <amount> --from-chain <chain> --to-token <tok>  # Bridge + swap
+zerion send <token> <amount> --to <address> --chain <chain>  # Send native or ERC-20 transfer
+zerion search <query>                                     # Search for tokens by name, symbol, or address
+zerion search <query> --chain <chain>                     # Search within a specific chain
+zerion search <query> --limit <n>                         # Limit results (default: 10)
+zerion chains                                             # List all supported chains
 ```
 
-### Analysis (read — supports --x402)
+### Agent operations — analysis (read-only, supports --x402)
 
 Accepts `0x...` address, ENS name, or local wallet name. Uses `--wallet` or default wallet if no argument given.
 
@@ -158,42 +166,44 @@ zerion history <address|name> --chain <chain>             # Filter by chain
 zerion pnl <address|name>                                 # Profit & loss (realized, unrealized, fees)
 ```
 
-### Trading
+### Agent operations — wallet info & config (read-only)
+
 ```
-zerion swap <from> <to> <amount>                          # Swap tokens
-zerion swap <from> <to> <amount> --chain <chain>          # Specify source chain
-zerion swap <from> <to> <amount> --to-chain <chain>       # Cross-chain swap
-zerion swap <from> <to> <amount> --slippage <percent>     # Custom slippage tolerance
-zerion swap <from> <to> <amount> --wallet <name>          # Use specific wallet
-zerion swap tokens                                        # List swap-available tokens (all chains)
-zerion swap tokens <chain>                                # List swap-available tokens for chain
-zerion bridge <token> <chain> <amount> --from-chain <chain>  # Bridge tokens cross-chain
-zerion bridge <token> <chain> <amount> --from-chain <chain> --to-token <tok>  # Bridge + swap
-zerion send <token> <amount> --to <address> --chain <chain>  # Send native or ERC-20 transfer
-zerion search <query>                                     # Search for tokens by name, symbol, or address
-zerion search <query> --chain <chain>                     # Search within a specific chain
-zerion search <query> --limit <n>                         # Limit results (default: 10)
-zerion chains                                             # List all supported chains
+zerion wallet list                                        # List all wallets (shows active policies)
+zerion wallet list --search <query>                       # Filter by name or address
+zerion wallet fund --wallet <name>                        # Show deposit addresses
+zerion watch list                                         # List watched wallets
+zerion agent list-tokens                                  # List agent tokens (shows policies + active status)
+zerion agent list-policies                                # List all policies
+zerion agent show-policy <id>                             # Show policy details
+zerion agent use-token --wallet <wallet>                  # Switch active agent token by wallet
+zerion config get <key>                                   # Get a single config value
+zerion config list                                        # Show current configuration
 ```
 
-### Agent tokens
+### Manual operations — wallet setup (requires passphrase/confirmation)
 
-A security policy is always required. If `--policy` is omitted, an interactive picker guides you through tier selection (Standard/Strict/Custom), expiry (7d/30d/no expiry), and optional chain restrictions.
+These commands require interactive input and must be run by a human directly. Agents should never call these.
+
+```
+zerion wallet create --name <name>                        # Create encrypted wallet (EVM + Solana)
+zerion wallet import --name <name> --evm-key              # Import from EVM private key (interactive)
+zerion wallet import --name <name> --sol-key              # Import from Solana private key (interactive)
+zerion wallet import --name <name> --mnemonic             # Import from seed phrase (interactive prompt)
+zerion wallet backup --wallet <name>                      # Export recovery phrase (mnemonic backup)
+zerion wallet delete <name>                               # Permanently delete a wallet (requires passphrase)
+zerion wallet sync --wallet <name>                        # Sync wallet to Zerion app via QR code
+zerion wallet sync --all                                  # Sync all wallets to Zerion app
+```
+
+### Manual operations — agent token & policy creation
 
 ```
 zerion agent create-token --name <bot> --wallet <wallet>  # Interactive policy setup
 zerion agent create-token --name <bot> --wallet <wallet> --policy <id>  # With existing policy
 zerion agent create-token --name <bot> --wallet <wallet> --policy <id1>,<id2>  # Multiple policies
-zerion agent list-tokens                                  # List agent tokens (shows active status)
-zerion agent use-token --wallet <wallet>                  # Switch active agent token by wallet
 zerion agent revoke-token --name <bot>                    # Revoke by name
 zerion agent revoke-token --id <id>                       # Revoke by ID
-```
-
-Token is auto-saved to config. All trading commands (swap, bridge, send) read it automatically.
-
-### Security policies
-```
 zerion agent create-policy --name <policy>                # Create policy (at least one rule required)
 zerion agent create-policy --name <policy> --chains base,arbitrum  # Chain lock
 zerion agent create-policy --name <policy> --expires 24h  # Expiry (e.g. 24h, 7d)
@@ -202,30 +212,19 @@ zerion agent create-policy --name <policy> --deny-approvals  # Block ERC-20 appr
 zerion agent create-policy --name <policy> --allowlist 0xAddr1,0xAddr2  # Allowlist-only
 zerion agent create-policy --name strict \
   --chains base --expires 7d --deny-transfers --deny-approvals  # Combined rules
-zerion agent list-policies                                # List all policies
-zerion agent show-policy <id>                             # Show policy details
 zerion agent delete-policy <id>                           # Delete a policy
 ```
 
-### Watchlist & analysis
+### Manual operations — watchlist & config changes
+
 ```
 zerion watch <address> --name <label>                     # Add wallet to watchlist (supports ENS)
-zerion watch list                                         # List watched wallets
 zerion watch remove <name>                                # Remove from watchlist
-zerion analyze <name|address>                             # Analyze wallet trading activity
-zerion analyze <name|address> --period 7d                 # Specify analysis period (e.g. 7d, 2w)
-zerion analyze <name|address> --chain <chain>             # Filter by chain
-```
-
-### Config
-```
 zerion config set apiKey <key>                            # Set API key
 zerion config set defaultWallet <name>                    # Set default wallet
 zerion config set defaultChain <chain>                    # Set default chain
 zerion config set slippage <percent>                      # Set slippage tolerance (default: 2%)
 zerion config unset <key>                                 # Remove a config value (resets to default)
-zerion config get <key>                                   # Get a single config value
-zerion config list                                        # Show current configuration
 ```
 
 ### Other
@@ -272,11 +271,11 @@ ethereum, base, arbitrum, optimism, polygon, binance-smart-chain, avalanche, gno
 
 Wallets are encrypted with AES-256-GCM via the Open Wallet Standard (OWS) vault at `~/.ows/`. Private keys never leave the device — signing happens locally, and the Zerion API never sees your keys.
 
-- **Passphrase**: Required for wallet creation/import only (never for trading). Always entered interactively.
+- **Agent operations** (trading + analysis): fully automated, no passphrase. Agents use these freely.
+- **Manual operations** (wallet setup, token/policy creation): require passphrase or interactive input. Humans must run these.
 - **Agent tokens**: Required for all trading (swap, bridge, send). Auto-saved to config on creation.
-- **Interactive key input**: `--key` prompts securely without exposing keys in shell history
 - **Config security**: `~/.zerion/config.json` is created with mode 0o600
-- **Sensitive commands are human-only**: `wallet create`, `wallet import`, `wallet backup`, and `wallet delete` always require interactive input — no automation bypass.
+- **Interactive key input**: `--key` prompts securely without exposing keys in shell history
 
 ## Troubleshooting
 

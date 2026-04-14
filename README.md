@@ -11,8 +11,8 @@ It packages two first-class integration paths:
 
 It ships two flagship workflows:
 
-- **`wallet-analysis`** — portfolio, positions, transactions, and PnL analysis
-- **`wallet-trading`** — swap, bridge, buy/sell tokens, wallet management, agent tokens, and security policies
+- **`wallet-analysis`** — portfolio, positions, transactions, and PnL analysis (agent operation)
+- **`wallet-trading`** — swap, bridge, buy/sell tokens (agent operation); wallet setup, agent tokens, and policies (manual, requires passphrase)
 
 ![Wallet analysis demo](./assets/demo-wallet-analysis.svg)
 
