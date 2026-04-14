@@ -66,16 +66,12 @@ zerion pnl <address|name>            Profit & loss (realized, unrealized, fees)
 All trading commands require an agent token (see below).
 
 ```
-zerion swap <from> <to> <amount>                             Swap tokens (quote only)
-zerion swap <from> <to> <amount> --yes                       Execute the swap
+zerion swap <from> <to> <amount>                             Swap tokens
 zerion swap <from> <to> <amount> --to-chain <chain>          Cross-chain swap
-zerion swap <from> <to> <amount> --to-chain <chain> --yes    Execute cross-chain swap
 zerion swap tokens [chain]                                   List tokens available for swap
-zerion bridge <token> <chain> <amount>                       Bridge tokens (quote only)
-zerion bridge <token> <chain> <amount> --yes                 Execute bridge
+zerion bridge <token> <chain> <amount>                       Bridge tokens cross-chain
 zerion bridge <token> <chain> <amount> --to-token <tok>      Bridge + swap on destination
-zerion send <token> <amount> --to <address>                  Send tokens (quote only)
-zerion send <token> <amount> --to <address> --yes            Execute native or ERC-20 transfer
+zerion send <token> <amount> --to <address> --chain <chain>  Send native or ERC-20 transfer
 zerion search <query>                                        Search for tokens by name or symbol
 ```
 
@@ -158,7 +154,6 @@ zerion --version                         Show version
 | `--json` | JSON output (default) |
 | `--pretty` | Human-readable output |
 | `--quiet` | Minimal output |
-| `--yes` | Skip confirmation prompts (required to execute trades) |
 
 ## Environment variables
 

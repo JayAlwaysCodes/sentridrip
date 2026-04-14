@@ -82,37 +82,34 @@ All trading commands require an agent token (see below). No passphrase prompts.
 ### Swap tokens
 
 ```bash
-# Get a quote
+# Swap tokens
 zerion swap ETH USDC 0.1
 
-# Execute the swap
-zerion swap ETH USDC 0.1 --yes
-
 # Cross-chain swap (swap + bridge)
-zerion swap ETH USDC 0.1 --to-chain arbitrum --yes
+zerion swap ETH USDC 0.1 --to-chain arbitrum
 
 # With timeout for slow bridges
-zerion swap ETH USDC 0.1 --to-chain arbitrum --timeout 300 --yes
+zerion swap ETH USDC 0.1 --to-chain arbitrum --timeout 300
 ```
 
 ### Bridge tokens
 
 ```bash
 # Bridge ETH to Arbitrum
-zerion bridge ETH arbitrum 0.1 --yes
+zerion bridge ETH arbitrum 0.1
 
 # Bridge + swap (bridge ETH to Arbitrum, receive USDC)
-zerion bridge ETH arbitrum 0.1 --to-token USDC --yes
+zerion bridge ETH arbitrum 0.1 --to-token USDC
 ```
 
 ### Send / transfer tokens
 
 ```bash
 # Send native token (ETH, BNB, etc.)
-zerion send ETH 0.01 --to 0x... --chain base --yes
+zerion send ETH 0.01 --to 0x... --chain base
 
 # Send ERC-20 token
-zerion send USDC 10 --to 0x... --chain ethereum --yes
+zerion send USDC 10 --to 0x... --chain ethereum
 ```
 
 ### Search tokens
@@ -206,7 +203,6 @@ zerion wallet sync --all                 # Sync all wallets
 - `--json` — JSON output (default, agent-friendly)
 - `--pretty` — Human-readable tables (auto-enabled for TTY)
 - `--quiet` — Minimal output
-- `--yes` — Skip confirmation prompts (required for trade execution)
 
 ## Supported chains
 
@@ -214,8 +210,7 @@ ethereum, base, arbitrum, optimism, polygon, binance-smart-chain, avalanche, gno
 
 ## Best practices
 
-1. **Always get a quote first** — run swap/bridge/send without `--yes` to see the quote
-2. **Create an agent token** — required for all trading; `zerion agent create-token` saves it to config
+1. **Create an agent token** — required for all trading; `zerion agent create-token` saves it to config
 3. **Apply security policies** — chain locks + allowlists prevent accidental trades
 4. **Set defaults** — `config set defaultWallet` and `config set defaultChain` reduce flag typing
 5. **Use `--timeout` for bridges** — cross-chain operations can be slow; default is 120s

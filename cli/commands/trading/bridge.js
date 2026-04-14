@@ -60,15 +60,6 @@ export default async function bridge(args, flags) {
       },
     };
 
-    if (!flags.yes) {
-      print({
-        ...quoteSummary,
-        action: "Confirm with --yes to execute",
-        command: `zerion bridge ${token} ${targetChain} ${amount} --from-chain ${fromChain} --wallet ${walletName} --yes`,
-      });
-      return;
-    }
-
     // Agent token required — no interactive passphrase for trading
     const passphrase = requireAgentToken();
     const timeout = parseTimeout(flags.timeout);

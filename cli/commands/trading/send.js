@@ -20,7 +20,7 @@ export default async function send(args, flags) {
 
   if (!token || !amount) {
     printError("missing_args", "Usage: zerion send <token> <amount> --to <address> --chain <chain>", {
-      example: "zerion send ETH 0.01 --to 0x... --chain base --yes",
+      example: "zerion send ETH 0.01 --to 0x... --chain base",
     });
     process.exit(1);
   }
@@ -74,15 +74,6 @@ export default async function send(args, flags) {
         type: isNative ? "native" : "erc20",
       },
     };
-
-    if (!flags.yes) {
-      print({
-        ...summary,
-        action: "Confirm with --yes to execute",
-        command: `zerion send ${token} ${amount} --to ${to} --chain ${chain} --wallet ${walletName} --yes`,
-      }, formatSwapQuote);
-      return;
-    }
 
     // Agent token required — no interactive passphrase for trading
     const passphrase = requireAgentToken();

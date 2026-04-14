@@ -62,20 +62,6 @@ export default async function swap(args, flags) {
       },
     };
 
-    // If not --yes, show quote and exit (confirmation flow)
-    if (!flags.yes) {
-      const chainFlags = isCrossChain
-        ? `--chain ${fromChain} --to-chain ${toChain}`
-        : `--chain ${fromChain}`;
-      const quoteData = {
-        ...quoteSummary,
-        action: "Confirm with --yes to execute",
-        command: `zerion swap ${fromToken} ${toToken} ${amount} ${chainFlags} --wallet ${walletName} --yes`,
-      };
-      print(quoteData, formatSwapQuote);
-      return;
-    }
-
     // 4. Execute — agent token required (no interactive passphrase for trading)
     const passphrase = requireAgentToken();
     const timeout = parseTimeout(flags.timeout);

@@ -56,8 +56,8 @@ zerion agent create-policy --name safe-trading \
   --chains base,arbitrum --deny-transfers --expires 7d
 
 # 5. Trade — agent token is read from config automatically
-zerion swap ETH USDC 0.01 --chain base --yes
-zerion send ETH 0.01 --to 0x... --chain base --yes
+zerion swap ETH USDC 0.01 --chain base
+zerion send ETH 0.01 --to 0x... --chain base
 ```
 
 ## Authentication
@@ -159,23 +159,17 @@ zerion pnl <address|name>                                 # Profit & loss (reali
 
 ### Trading
 ```
-zerion swap <from> <to> <amount>                          # Get a quote (no execution)
-zerion swap <from> <to> <amount> --yes                    # Execute the swap
+zerion swap <from> <to> <amount>                          # Swap tokens
 zerion swap <from> <to> <amount> --chain <chain>          # Specify source chain
-zerion swap <from> <to> <amount> --to-chain <chain>       # Cross-chain swap (quote)
-zerion swap <from> <to> <amount> --to-chain <chain> --yes # Cross-chain swap (execute)
+zerion swap <from> <to> <amount> --to-chain <chain>       # Cross-chain swap
 zerion swap <from> <to> <amount> --slippage <percent>     # Custom slippage tolerance
-zerion swap <from> <to> <amount> --wallet <name> --yes    # Execute with specific wallet
+zerion swap <from> <to> <amount> --wallet <name>          # Use specific wallet
 zerion swap tokens                                        # List swap-available tokens (all chains)
 zerion swap tokens <chain>                                # List swap-available tokens for chain
-zerion bridge <token> <chain> <amount>                    # Bridge quote (no execution)
-zerion bridge <token> <chain> <amount> --yes              # Execute bridge
+zerion bridge <token> <chain> <amount>                    # Bridge tokens cross-chain
 zerion bridge <token> <chain> <amount> --from-chain <chain>  # Specify source chain
-zerion bridge <token> <chain> <amount> --to-token <tok>   # Bridge + swap on destination (quote)
-zerion bridge <token> <chain> <amount> --to-token <tok> --yes  # Bridge + swap (execute)
-zerion send <token> <amount> --to <address>                # Send quote (no execution)
-zerion send <token> <amount> --to <address> --yes         # Execute native or ERC-20 transfer
-zerion send <token> <amount> --to <address> --chain <chain> --yes  # On specific chain
+zerion bridge <token> <chain> <amount> --to-token <tok>   # Bridge + swap on destination
+zerion send <token> <amount> --to <address> --chain <chain>  # Send native or ERC-20 transfer
 zerion search <query>                                     # Search for tokens by name, symbol, or address
 zerion search <query> --chain <chain>                     # Search within a specific chain
 zerion search <query> --limit <n>                         # Limit results (default: 10)
@@ -258,7 +252,6 @@ zerion --version                                          # Show version
 | `--json` | JSON output (default) |
 | `--pretty` | Human-readable output |
 | `--quiet` | Minimal output |
-| `--yes` | Skip confirmation prompts (required to execute trades) |
 | `--to <address>` | Recipient address for send command |
 | `--timeout <seconds>` | Transaction confirmation timeout (default: 120s) |
 

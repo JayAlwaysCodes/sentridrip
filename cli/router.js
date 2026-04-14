@@ -40,7 +40,7 @@ function printUsage() {
       "pnl <address|name>": "Profit & loss (realized, unrealized, fees)",
     },
     trading: {
-      "swap <from> <to> <amount>": "Swap tokens (quote only; add --yes to execute)",
+      "swap <from> <to> <amount>": "Swap tokens",
       "swap <from> <to> <amount> --to-chain <chain>": "Cross-chain swap",
       "swap tokens [chain]": "List tokens available for swap",
       "bridge <token> <chain> <amount>": "Bridge tokens cross-chain",
@@ -87,7 +87,6 @@ function printUsage() {
       "--json": "JSON output (default)",
       "--pretty": "Human-readable output",
       "--quiet": "Minimal output",
-      "--yes": "Skip confirmation prompts (required to execute trades)",
     },
     policy_flags: {
       "--chains <list>": "Restrict to specific chains (comma-separated)",
