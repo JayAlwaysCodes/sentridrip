@@ -60,7 +60,12 @@ export function formatWalletList(data) {
     lines.push(`  ${BOLD}${w.name}${RESET}${def}`);
     if (w.evmAddress) lines.push(`  ${DIM}EVM:${RESET} ${w.evmAddress}`);
     if (w.solAddress) lines.push(`  ${DIM}SOL:${RESET} ${w.solAddress}`);
-    if (w.policies?.length) lines.push(`  ${DIM}Policies:${RESET} ${w.policies.join(", ")}`);
+    if (w.policies?.length) {
+      for (const p of w.policies) {
+        const detail = p.summary ? ` ${DIM}(${p.summary})${RESET}` : "";
+        lines.push(`  ${DIM}Policy:${RESET} ${p.name}${detail}`);
+      }
+    }
     lines.push("");
   }
   if (data.hasMore) {

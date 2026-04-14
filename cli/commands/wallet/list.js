@@ -2,9 +2,11 @@ import * as ows from "../../lib/wallet/keystore.js";
 import { print, printError } from "../../lib/util/output.js";
 import { getConfigValue, getWalletOrigin, getWalletAddresses } from "../../lib/config.js";
 import { formatWalletList } from "../../lib/util/format.js";
+import { fromCaip2 } from "../../lib/chain/registry.js";
 
 /**
- * Find the newest agent token for a wallet and resolve its policy names.
+ * Find the newest agent token for a wallet and resolve policy details.
+ * Returns array of { name, summary } for compact display.
  */
 function getActivePolicies(walletName) {
   const tokens = ows.listAgentTokens();
@@ -18,11 +20,25 @@ function getActivePolicies(walletName) {
   return active.policyIds.map((pid) => {
     try {
       const p = ows.getPolicy(pid);
-      return p.name || pid;
+      return { name: p.name || pid, summary: summarizePolicy(p) };
     } catch {
-      return pid;
+      return { name: pid, summary: "" };
     }
   });
+}
+
+function summarizePolicy(policy) {
+  const parts = [];
+  for (const r of policy.rules || []) {
+    if (r.type === "allowed_chains") {
+      parts.push("chains: " + r.chain_ids.map(fromCaip2).join(", "));
+    } else if (r.type === "expires_at") {
+      parts.push("expires " + r.timestamp.split("T")[0]);
+    }
+  }
+  const scripts = (policy.config?.scripts || []).map((s) => s.split("/").pop().replace(".mjs", ""));
+  if (scripts.length) parts.push(scripts.join(", "));
+  return parts.join(" | ");
 }
 
 export default async function walletList(_args, flags) {
