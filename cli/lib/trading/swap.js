@@ -4,6 +4,7 @@
  * Flow: resolveTokens → getQuote → (simulate) → (approve) → sign → broadcast
  */
 
+import { parseUnits } from "viem";
 import * as api from "../api/client.js";
 import { resolveToken } from "./resolve-token.js";
 import { signSwapTransaction, broadcastAndWait, approveErc20 } from "./transaction.js";
@@ -29,10 +30,8 @@ export async function getSwapQuote({
     resolveToken(toToken, toChain),
   ]);
 
-  // Convert amount to smallest units
-  const amountInSmallestUnits = Math.floor(
-    parseFloat(amount) * Math.pow(10, fromResolved.decimals)
-  ).toString();
+  // Convert amount to smallest units using viem's parseUnits for precision
+  const amountInSmallestUnits = parseUnits(amount, fromResolved.decimals).toString();
 
   const params = {
     "input[from]": walletAddress,

@@ -12,7 +12,7 @@ function parseExpires(input) {
   // Relative: 1h, 24h, 7d, 30d
   const match = input.match(/^(\d+)([hdm])$/i);
   if (match) {
-    const n = parseInt(match[1]);
+    const n = parseInt(match[1], 10);
     const unit = match[2].toLowerCase();
     const ms =
       unit === "h" ? n * 3600_000 :

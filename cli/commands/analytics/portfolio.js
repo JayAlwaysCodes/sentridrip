@@ -41,7 +41,7 @@ export default async function portfolio(args, flags) {
         change_24h: change24h,
         currency: "usd",
       },
-      positions: positions.slice(0, flags.limit ? parseInt(flags.limit) : 20),
+      positions: positions.slice(0, flags.limit ? parseInt(flags.limit, 10) : 20),
       positionCount: positions.length,
     };
     print(data, formatPortfolio);

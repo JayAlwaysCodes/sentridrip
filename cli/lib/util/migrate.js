@@ -4,12 +4,16 @@
  * (stderr so JSON stdout stays clean for agent consumers).
  */
 
-import { existsSync, renameSync, mkdirSync } from "node:fs";
+import { existsSync, renameSync } from "node:fs";
 import { join } from "node:path";
+import { HOME } from "./constants.js";
 
-const HOME = process.env.HOME || process.env.USERPROFILE;
 const OLD_DIR = join(HOME, ".zerion-cli");
 const NEW_DIR = join(HOME, ".zerion");
+
+function notice(obj) {
+  process.stderr.write(JSON.stringify(obj) + "\n");
+}
 
 export function migrateFromZerionCli() {
   if (!existsSync(OLD_DIR)) return;
@@ -17,30 +21,24 @@ export function migrateFromZerionCli() {
   if (!existsSync(NEW_DIR)) {
     try {
       renameSync(OLD_DIR, NEW_DIR);
-      process.stderr.write(
-        "\n" +
-        "╔══════════════════════════════════════════════════════════════╗\n" +
-        "║  zerion-cli has been renamed to zerion                      ║\n" +
-        "║                                                             ║\n" +
-        "║  • Command is now: zerion (not zerion-cli)                  ║\n" +
-        "║  • Config migrated: ~/.zerion-cli → ~/.zerion               ║\n" +
-        "║  • You can uninstall the old package:                       ║\n" +
-        "║      npm uninstall -g zerion-cli                            ║\n" +
-        "╚══════════════════════════════════════════════════════════════╝\n" +
-        "\n"
-      );
+      notice({
+        notice: "migration",
+        message: "zerion-cli has been renamed to zerion",
+        migrated: { from: OLD_DIR, to: NEW_DIR },
+        action: "npm uninstall -g zerion-cli",
+      });
     } catch {
-      // If rename fails (e.g. cross-device), warn but don't crash
-      process.stderr.write(
-        "[zerion] Warning: could not migrate ~/.zerion-cli → ~/.zerion. " +
-        "Please move it manually.\n"
-      );
+      notice({
+        notice: "migration",
+        message: "Could not migrate ~/.zerion-cli → ~/.zerion. Please move it manually.",
+        migrated: false,
+      });
     }
   } else {
-    // Both dirs exist — just notify to clean up
-    process.stderr.write(
-      "[zerion] Note: zerion-cli has been renamed to zerion. " +
-      "You can remove the old ~/.zerion-cli directory.\n"
-    );
+    notice({
+      notice: "migration",
+      message: "zerion-cli has been renamed to zerion. You can remove ~/.zerion-cli.",
+      migrated: false,
+    });
   }
 }

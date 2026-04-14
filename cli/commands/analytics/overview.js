@@ -8,6 +8,7 @@ import { summarizeAnalyze } from "../../lib/util/analyze.js";
 import { print, printError } from "../../lib/util/output.js";
 import { isX402Enabled } from "../../lib/api/x402.js";
 import { resolveAddress } from "../../lib/wallet/resolve.js";
+import { validateChain } from "../../lib/util/validate.js";
 
 export default async function walletAnalyze(args, flags) {
   const address = args[0] || flags.address;
@@ -16,10 +17,16 @@ export default async function walletAnalyze(args, flags) {
     process.exit(1);
   }
 
+  const chainErr = validateChain(flags.chain);
+  if (chainErr) {
+    printError(chainErr.code, chainErr.message, { supportedChains: chainErr.supportedChains });
+    process.exit(1);
+  }
+
   const resolved = await resolveAddress(address);
   const useX402 = flags.x402 === true || isX402Enabled();
   const addr = encodeURIComponent(resolved);
-  const txLimit = flags.limit ? parseInt(flags.limit) : 10;
+  const txLimit = flags.limit ? parseInt(flags.limit, 10) : 10;
 
   const posParams = { "filter[positions]": "no_filter" };
   const txParams = { "page[size]": txLimit };

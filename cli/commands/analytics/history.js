@@ -11,7 +11,7 @@ export default async function history(args, flags) {
   try {
     const response = await api.getTransactions(address, {
       chainId: flags.chain,
-      limit: flags.limit ? parseInt(flags.limit) : 10,
+      limit: flags.limit ? parseInt(flags.limit, 10) : 10,
       useX402,
     });
 
@@ -21,8 +21,8 @@ export default async function history(args, flags) {
       status: tx.attributes?.status,
       timestamp: tx.attributes?.mined_at,
       chain: tx.relationships?.chain?.data?.id,
-      fee: tx.attributes.fee?.value,
-      transfers: (tx.attributes.transfers || []).map((t) => ({
+      fee: tx.attributes?.fee?.value,
+      transfers: (tx.attributes?.transfers || []).map((t) => ({
         direction: t.direction,
         fungible: t.fungible_info?.symbol,
         quantity: t.quantity?.float,

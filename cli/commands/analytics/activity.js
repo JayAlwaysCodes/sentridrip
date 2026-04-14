@@ -7,8 +7,8 @@ import { formatAnalysis } from "../../lib/util/format.js";
 function parsePeriod(input) {
   if (!input) return 7;
   const match = input.match(/^(\d+)([dw])$/i);
-  if (!match) return parseInt(input) || 7;
-  const n = parseInt(match[1]);
+  if (!match) return parseInt(input, 10) || 7;
+  const n = parseInt(match[1], 10);
   return match[2].toLowerCase() === "w" ? n * 7 : n;
 }
 

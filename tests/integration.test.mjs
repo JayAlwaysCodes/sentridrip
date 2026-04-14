@@ -41,15 +41,17 @@ describe("integration tests (requires ZERION_API_KEY)", () => {
       const { code, json } = await run(["wallet", "portfolio", VITALIK]);
       assert.equal(code, 0);
       assert.ok(json);
-      assert.ok(json.data);
-      assert.ok(json.data.attributes);
+      assert.ok(json.wallet);
+      assert.ok(json.portfolio);
+      assert.ok(typeof json.portfolio.total === "number");
     });
 
     it("works with ENS name", { skip: SKIP ? SKIP_MSG : false }, async () => {
       const { code, json } = await run(["wallet", "portfolio", "vitalik.eth"]);
       assert.equal(code, 0);
       assert.ok(json);
-      assert.ok(json.data);
+      assert.ok(json.wallet);
+      assert.equal(json.wallet.name, "vitalik.eth");
     });
   });
 
@@ -58,28 +60,28 @@ describe("integration tests (requires ZERION_API_KEY)", () => {
       const { code, json } = await run(["wallet", "positions", VITALIK]);
       assert.equal(code, 0);
       assert.ok(json);
-      assert.ok(Array.isArray(json.data));
+      assert.ok(Array.isArray(json.positions));
     });
 
     it("filters by chain", { skip: SKIP ? SKIP_MSG : false }, async () => {
       const { code, json } = await run(["wallet", "positions", VITALIK, "--chain", "ethereum"]);
       assert.equal(code, 0);
       assert.ok(json);
-      assert.ok(Array.isArray(json.data));
+      assert.ok(Array.isArray(json.positions));
     });
 
     it("filters by --positions simple", { skip: SKIP ? SKIP_MSG : false }, async () => {
       const { code, json } = await run(["wallet", "positions", VITALIK, "--positions", "simple"]);
       assert.equal(code, 0);
       assert.ok(json);
-      assert.ok(Array.isArray(json.data));
+      assert.ok(Array.isArray(json.positions));
     });
 
     it("filters by --positions defi", { skip: SKIP ? SKIP_MSG : false }, async () => {
       const { code, json } = await run(["wallet", "positions", VITALIK, "--positions", "defi"]);
       assert.equal(code, 0);
       assert.ok(json);
-      assert.ok(Array.isArray(json.data));
+      assert.ok(Array.isArray(json.positions));
     });
   });
 
@@ -88,13 +90,14 @@ describe("integration tests (requires ZERION_API_KEY)", () => {
       const { code, json } = await run(["wallet", "transactions", VITALIK]);
       assert.equal(code, 0);
       assert.ok(json);
-      assert.ok(json.data);
+      assert.ok(Array.isArray(json.transactions));
     });
 
     it("respects custom limit", { skip: SKIP ? SKIP_MSG : false }, async () => {
       const { code, json } = await run(["wallet", "transactions", VITALIK, "--limit", "5"]);
       assert.equal(code, 0);
       assert.ok(json);
+      assert.ok(json.transactions.length <= 5);
     });
 
     it("filters by chain", { skip: SKIP ? SKIP_MSG : false }, async () => {
@@ -109,8 +112,8 @@ describe("integration tests (requires ZERION_API_KEY)", () => {
       const { code, json } = await run(["wallet", "pnl", VITALIK]);
       assert.equal(code, 0);
       assert.ok(json);
-      assert.ok(json.data);
-      assert.ok(json.data.attributes);
+      assert.ok(json.wallet);
+      assert.ok(json.pnl);
     });
   });
 

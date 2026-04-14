@@ -15,7 +15,7 @@ export default async function search(args, flags) {
   try {
     const response = await api.searchFungibles(query, {
       chainId: flags.chain,
-      limit: flags.limit ? parseInt(flags.limit) : 10,
+      limit: flags.limit ? parseInt(flags.limit, 10) : 10,
     });
 
     const results = (response.data || []).map((item) => ({

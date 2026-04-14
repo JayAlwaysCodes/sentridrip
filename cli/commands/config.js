@@ -1,7 +1,13 @@
 import { loadConfig, getConfigValue, setConfigValue } from "../lib/config.js";
 import { print, printError } from "../lib/util/output.js";
 
-const VALID_KEYS = ["apiKey", "defaultWallet", "slippage", "defaultChain"];
+const VALID_KEYS = ["apiKey", "agentToken", "defaultWallet", "slippage", "defaultChain"];
+const SENSITIVE_KEYS = new Set(["apiKey", "agentToken"]);
+
+function redact(key, val) {
+  if (!SENSITIVE_KEYS.has(key) || !val) return val;
+  return val.length > 8 ? val.slice(0, 8) + "..." : "***";
+}
 
 export default async function configCmd(args, flags) {
   const [action, key, ...valueParts] = args;
@@ -9,10 +15,9 @@ export default async function configCmd(args, flags) {
 
   switch (action) {
     case "list": {
-      const config = loadConfig();
-      // Mask API key for security
-      if (config.apiKey) {
-        config.apiKey = config.apiKey.slice(0, 10) + "...";
+      const config = { ...loadConfig() };
+      for (const k of SENSITIVE_KEYS) {
+        if (config[k]) config[k] = redact(k, config[k]);
       }
       print({ config });
       break;
@@ -26,12 +31,12 @@ export default async function configCmd(args, flags) {
         process.exit(1);
       }
       const val = getConfigValue(key);
-      print({ [key]: key === "apiKey" && val ? val.slice(0, 10) + "..." : val });
+      print({ [key]: redact(key, val) });
       break;
     }
 
     case "set": {
-      if (!key || !value) {
+      if (!key || value === undefined || value === null || value === "") {
         printError("missing_input", "Usage: zerion config set <key> <value>", {
           validKeys: VALID_KEYS,
         });
@@ -43,10 +48,9 @@ export default async function configCmd(args, flags) {
         });
         process.exit(1);
       }
-      // Parse numeric values
       const parsed = key === "slippage" ? parseFloat(value) : value;
       setConfigValue(key, parsed);
-      print({ [key]: key === "apiKey" ? value.slice(0, 10) + "..." : parsed, updated: true });
+      print({ [key]: redact(key, value), updated: true });
       break;
     }
 
