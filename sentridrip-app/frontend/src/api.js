@@ -18,6 +18,7 @@ export const strategiesApi = {
 
 export const walletApi = {
   list: () => api.get("/wallet/list"),
+  create: (name, passphrase) => api.post("/wallet/create", { name, passphrase }),
   portfolio: (wallet) => api.get("/wallet/portfolio/" + wallet),
   positions: (wallet) => api.get("/wallet/positions/" + wallet),
   info: (wallet) => api.get("/wallet/info/" + wallet),

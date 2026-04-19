@@ -1,6 +1,174 @@
 import { useState, useEffect } from "react";
 import { walletApi } from "../api";
 
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors shrink-0"
+    >
+      {copied ? "Copied!" : "Copy"}
+    </button>
+  );
+}
+
+function CreateWalletModal({ onClose, onCreated }) {
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState({ name: "", passphrase: "", confirm: "" });
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    if (form.passphrase !== form.confirm) {
+      setError("Passphrases do not match");
+      return;
+    }
+    if (form.passphrase.length < 8) {
+      setError("Passphrase must be at least 8 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await walletApi.create(form.name, form.passphrase);
+      setResult(res.data.data);
+      setStep(3);
+      onCreated();
+    } catch (e) {
+      setError(e.response?.data?.error || e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+          <h2 className="font-bold text-lg">Create New Wallet</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">x</button>
+        </div>
+
+        <div className="p-6">
+          {step === 1 && (
+            <div className="space-y-4">
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 text-sm text-yellow-400">
+                Your passphrase is the ONLY way to access your wallet. There is no reset or recovery. Store it safely before proceeding.
+              </div>
+              <button
+                onClick={() => setStep(2)}
+                className="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-bold py-3 rounded-xl transition-colors"
+              >
+                I understand, continue
+              </button>
+            </div>
+          )}
+
+          {step === 2 && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">Wallet Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. my-sol-wallet"
+                  value={form.name}
+                  onChange={(e) => set("name", e.target.value)}
+                  required
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">Passphrase</label>
+                <input
+                  type="password"
+                  placeholder="Min 8 characters"
+                  value={form.passphrase}
+                  onChange={(e) => set("passphrase", e.target.value)}
+                  required
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">Confirm Passphrase</label>
+                <input
+                  type="password"
+                  placeholder="Repeat passphrase"
+                  value={form.confirm}
+                  onChange={(e) => set("confirm", e.target.value)}
+                  required
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+                />
+              </div>
+              {error && <p className="text-red-400 text-sm">{error}</p>}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 py-2.5 rounded-xl text-sm transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-gray-950 font-bold py-2.5 rounded-xl transition-colors text-sm"
+                >
+                  {loading ? "Creating..." : "Create Wallet"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {step === 3 && result && (
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-green-400 text-xl">✓</span>
+                </div>
+                <h3 className="font-bold text-green-400">Wallet Created!</h3>
+              </div>
+              {result.solAddress && (
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Solana Address</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono text-xs text-cyan-400 break-all flex-1">{result.solAddress}</p>
+                    <CopyButton text={result.solAddress} />
+                  </div>
+                </div>
+              )}
+              {result.evmAddress && (
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">EVM Address</p>
+                  <p className="font-mono text-xs text-gray-400 break-all">{result.evmAddress}</p>
+                </div>
+              )}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-xs text-yellow-400">
+                Fund this Solana address with SOL and USDC to start your DCA strategies.
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-bold py-2.5 rounded-xl transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function WalletPage() {
   const [wallets, setWallets] = useState([]);
   const [portfolio, setPortfolio] = useState(null);
@@ -9,20 +177,20 @@ export default function WalletPage() {
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState(null);
   const [error, setError] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
 
   const loadWallets = async () => {
     try {
       const res = await walletApi.list();
       const data = res.data.data;
       const list = data.wallets || [];
-      setWallets(Array.isArray(list) ? list : []);
-      if (Array.isArray(list) && list.length > 0) {
-        const first = list[0].name || list[0];
-        setSelectedWallet(first);
+      setWallets(list);
+      if (list.length > 0 && !selectedWallet) {
+        setSelectedWallet(list[0].name);
       }
       setError(null);
     } catch (e) {
-      setError("Could not load wallets. Make sure the backend is running.");
+      setError("Could not load wallets.");
     } finally {
       setLoading(false);
     }
@@ -50,59 +218,70 @@ export default function WalletPage() {
   useEffect(() => { loadWallets(); }, []);
   useEffect(() => { if (selectedWallet) loadPortfolio(selectedWallet); }, [selectedWallet]);
 
-  const selectedWalletObj = wallets.find((w) => (w.name || w) === selectedWallet);
+  const selectedWalletObj = wallets.find((w) => w.name === selectedWallet);
   const solAddr = selectedWalletObj ? selectedWalletObj.solAddress : null;
   const evmAddr = selectedWalletObj ? selectedWalletObj.evmAddress : null;
-
-  const shortAddr = (addr) => {
-    if (!addr) return null;
-    return addr.slice(0, 8) + "..." + addr.slice(-6);
-  };
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-  };
+  const shortAddr = (addr) => addr ? addr.slice(0, 8) + "..." + addr.slice(-6) : null;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Wallet Manager</h1>
-        <p className="text-gray-400 text-sm mt-1">View your wallets and Solana portfolio</p>
+      {showCreate && (
+        <CreateWalletModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { loadWallets(); setShowCreate(false); }}
+        />
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Wallet Manager</h1>
+          <p className="text-gray-400 text-sm mt-1">Manage your wallets and view your Solana portfolio</p>
+        </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
+        >
+          + New Wallet
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
           <h2 className="font-semibold mb-3 text-sm text-gray-400 uppercase tracking-wider">Wallets</h2>
           {loading && <p className="text-gray-500 text-sm">Loading...</p>}
           {error && <p className="text-red-400 text-sm">{error}</p>}
           {!loading && wallets.length === 0 && (
-            <div className="text-center py-4">
-              <p className="text-gray-500 text-sm">No wallets found.</p>
-              <p className="text-gray-600 text-xs mt-2">Create one in terminal:</p>
-              <code className="text-cyan-500 text-xs block mt-1">node cli/zerion.js wallet create</code>
+            <div className="text-center py-6">
+              <p className="text-gray-500 text-sm">No wallets yet.</p>
+              <button
+                onClick={() => setShowCreate(true)}
+                className="mt-3 text-sm text-cyan-400 hover:underline"
+              >
+                Create your first wallet
+              </button>
             </div>
           )}
           <div className="space-y-2">
             {wallets.map((w, i) => {
-              const name = w.name || w;
-              const isSelected = selectedWallet === name;
-              const addr = w.solAddress ? shortAddr(w.solAddress) : null;
+              const isSelected = selectedWallet === w.name;
               return (
                 <div
                   key={i}
-                  onClick={() => setSelectedWallet(name)}
+                  onClick={() => setSelectedWallet(w.name)}
                   className={"p-3 rounded-lg cursor-pointer border transition-all " +
                     (isSelected
                       ? "border-cyan-500 bg-cyan-500/10"
                       : "border-gray-700 hover:border-gray-600 bg-gray-800/50")}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm">{name}</span>
+                    <span className="font-medium text-sm">{w.name}</span>
                     {isSelected && <span className="text-xs text-cyan-400">Active</span>}
                   </div>
-                  {addr && (
-                    <p className="text-xs text-gray-500 mt-1 font-mono">{addr}</p>
+                  {w.solAddress && (
+                    <p className="text-xs text-gray-500 mt-1 font-mono">{shortAddr(w.solAddress)}</p>
+                  )}
+                  {w.isDefault && (
+                    <span className="text-xs text-purple-400 mt-1 block">Default</span>
                   )}
                 </div>
               );
@@ -113,23 +292,18 @@ export default function WalletPage() {
         <div className="md:col-span-2 space-y-4">
           {selectedWallet && (
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <h2 className="font-semibold mb-3 text-sm text-gray-400 uppercase tracking-wider">Wallet Info</h2>
-              <div className="space-y-3">
+              <h2 className="font-semibold mb-4 text-sm text-gray-400 uppercase tracking-wider">Wallet Info</h2>
+              <div className="space-y-4">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Wallet Name</p>
-                  <p className="font-mono text-sm text-white">{selectedWallet}</p>
+                  <p className="font-mono text-sm">{selectedWallet}</p>
                 </div>
                 {solAddr && (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Solana Address</p>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-mono text-xs text-cyan-400 break-all">{solAddr}</p>
-                      <button
-                        onClick={() => copyToClipboard(solAddr)}
-                        className="text-xs text-gray-500 hover:text-white bg-gray-800 px-2 py-1 rounded shrink-0"
-                      >
-                        Copy
-                      </button>
+                      <p className="font-mono text-xs text-cyan-400 break-all flex-1">{solAddr}</p>
+                      <CopyButton text={solAddr} />
                     </div>
                     <button
                       onClick={() => window.open("https://solscan.io/account/" + solAddr, "_blank")}
@@ -142,7 +316,22 @@ export default function WalletPage() {
                 {evmAddr && (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">EVM Address</p>
-                    <p className="font-mono text-xs text-gray-400 break-all">{evmAddr}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-mono text-xs text-gray-400 break-all flex-1">{evmAddr}</p>
+                      <CopyButton text={evmAddr} />
+                    </div>
+                  </div>
+                )}
+                {selectedWalletObj && selectedWalletObj.policies && selectedWalletObj.policies.length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">Attached Policies</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedWalletObj.policies.map((p, i) => (
+                        <span key={i} className="text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-full px-3 py-1">
+                          {p.summary || p.name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -151,53 +340,50 @@ export default function WalletPage() {
 
           {selectedWallet && (
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <h2 className="font-semibold mb-3 text-sm text-gray-400 uppercase tracking-wider">
-                Solana Portfolio
-              </h2>
-
+              <h2 className="font-semibold mb-4 text-sm text-gray-400 uppercase tracking-wider">Solana Portfolio</h2>
               {portfolioLoading && (
                 <div className="flex items-center gap-2 text-gray-400 text-sm">
                   <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
                   Loading portfolio...
                 </div>
               )}
-
               {!portfolioLoading && portfolio && (
                 <div className="space-y-3">
                   {portfolio.portfolio && portfolio.portfolio.total != null && (
                     <div className="bg-gray-800 rounded-lg p-3">
                       <p className="text-xs text-gray-500">Total Value</p>
-                      <p className="text-xl font-bold mt-0.5">
+                      <p className="text-2xl font-bold mt-0.5">
                         {"$" + parseFloat(portfolio.portfolio.total).toFixed(2)}
                       </p>
                     </div>
                   )}
-
                   {positions.length > 0 && (
                     <div className="space-y-2">
+                      <p className="text-xs text-gray-500 uppercase tracking-wider">Positions</p>
                       {positions.slice(0, 8).map((p, i) => {
                         const attr = p.attributes || p;
                         const symbol = attr.fungible_info ? attr.fungible_info.symbol : "Unknown";
-                        const value = attr.value != null
-                          ? "$" + parseFloat(attr.value).toFixed(2)
-                          : "N/A";
+                        const value = attr.value != null ? "$" + parseFloat(attr.value).toFixed(2) : "N/A";
                         const qty = attr.quantity && attr.quantity.float != null
-                          ? parseFloat(attr.quantity.float).toFixed(4)
-                          : "0";
+                          ? parseFloat(attr.quantity.float).toFixed(4) : "0";
                         const change = attr.changes ? attr.changes.percent_1d : null;
                         const changePositive = change != null && change >= 0;
                         const changeText = change != null
-                          ? (changePositive ? "+" : "") + change.toFixed(2) + "%"
-                          : null;
+                          ? (changePositive ? "+" : "") + change.toFixed(2) + "%" : null;
                         return (
-                          <div key={i} className="flex justify-between items-center p-2 bg-gray-800/50 rounded-lg text-sm">
-                            <span className="font-mono font-medium">{symbol}</span>
+                          <div key={i} className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center text-xs font-bold">
+                                {symbol.slice(0, 1)}
+                              </div>
+                              <span className="font-medium">{symbol}</span>
+                            </div>
                             <div className="text-right">
-                              <p className="text-white">{value}</p>
+                              <p className="font-semibold">{value}</p>
                               <div className="flex items-center gap-2 justify-end">
                                 <p className="text-xs text-gray-500">{qty + " " + symbol}</p>
                                 {changeText && (
-                                  <p className={"text-xs " + (changePositive ? "text-green-400" : "text-red-400")}>
+                                  <p className={"text-xs font-medium " + (changePositive ? "text-green-400" : "text-red-400")}>
                                     {changeText}
                                   </p>
                                 )}
@@ -208,23 +394,23 @@ export default function WalletPage() {
                       })}
                     </div>
                   )}
-
                   {positions.length === 0 && (
-                    <p className="text-gray-500 text-sm">
-                      No Solana positions yet. Fund your wallet to get started.
-                    </p>
+                    <p className="text-gray-500 text-sm">No Solana positions yet.</p>
                   )}
                 </div>
               )}
-
               {!portfolioLoading && !portfolio && (
-                <div className="text-center py-4">
-                  <p className="text-gray-500 text-sm">No portfolio data available.</p>
-                  <p className="text-gray-600 text-xs mt-1">Wallet may not be funded on mainnet yet.</p>
+                <div className="text-center py-6 space-y-2">
+                  <p className="text-gray-400 text-sm font-medium">Wallet not funded on mainnet yet</p>
+                  <p className="text-gray-600 text-xs">Send SOL and USDC to your Solana address to get started</p>
                   {solAddr && (
-                    <p className="text-xs text-cyan-500 mt-2 font-mono break-all">
-                      {"Deposit SOL to: " + solAddr}
-                    </p>
+                    <div className="mt-3 bg-gray-800 rounded-lg p-3 text-left">
+                      <p className="text-xs text-gray-500 mb-1">Deposit address</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-xs text-cyan-400 break-all flex-1">{solAddr}</p>
+                        <CopyButton text={solAddr} />
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
