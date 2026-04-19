@@ -6,7 +6,7 @@ import { getDb } from "../db/database.js";
 
 const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ZERION_CLI = join(__dirname, "../../../../../cli/zerion.js");
+const ZERION_CLI = join(__dirname, "../../../../cli/zerion.js");
 
 export function validatePolicies(strategy, currentPrice) {
   const now = new Date();
@@ -64,7 +64,12 @@ export async function executeSwapViaCli(strategy) {
   try {
     const { stdout, stderr } = await execFileAsync("node", args, {
       timeout: 60_000,
-      env: { ...process.env },
+      env: {
+        ...process.env,
+        ZERION_API_KEY: process.env.ZERION_API_KEY,
+        ZERION_AGENT_TOKEN: process.env.ZERION_AGENT_TOKEN,
+        SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
+      },
     });
 
     if (stderr && !stdout) throw new Error(stderr.trim());
