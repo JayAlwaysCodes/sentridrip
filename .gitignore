@@ -1,4 +1,9 @@
 node_modules/
 .env
 .env.local
-.DS_Store
+.DS_Store.env
+sentridrip-app/backend/.env
+sentridrip-app/backend/data/
+node_modules/
+sentridrip-app/frontend/node_modules/
+sentridrip-app/backend/node_modules/
