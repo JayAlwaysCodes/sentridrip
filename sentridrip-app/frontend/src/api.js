@@ -1,5 +1,8 @@
 import axios from "axios";
-const api = axios.create({ baseURL: "/api" });
+const BASE_URL = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL + "/api"
+  : "/api";
+const api = axios.create({ baseURL: BASE_URL });
 
 export const priceApi = {
   getSol: () => api.get("/price/sol"),
