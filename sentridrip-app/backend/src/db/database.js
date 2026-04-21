@@ -34,6 +34,18 @@ export function initDb() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS strategy_tiers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      strategy_id INTEGER NOT NULL,
+      tier_number INTEGER NOT NULL,
+      target_price REAL NOT NULL,
+      amount_per_buy TEXT NOT NULL,
+      total_spent TEXT NOT NULL DEFAULT '0',
+      total_buys INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+    );
+
     CREATE TABLE IF NOT EXISTS transactions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       strategy_id INTEGER NOT NULL,

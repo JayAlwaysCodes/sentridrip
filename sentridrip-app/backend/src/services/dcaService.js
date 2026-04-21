@@ -12,52 +12,28 @@ export function validatePolicies(strategy, currentPrice) {
   const now = new Date();
 
   const expiry = new Date(strategy.expiry_date);
-  if (now > expiry) {
-    return { allowed: false, reason: "Strategy has expired" };
-  }
+  if (now > expiry) return { allowed: false, reason: "Strategy has expired" };
 
   const totalSpent = parseFloat(strategy.total_spent || "0");
   const spendLimit = parseFloat(strategy.spend_limit);
-  const amountPerBuy = parseFloat(strategy.amount_per_buy);
-  if (totalSpent + amountPerBuy > spendLimit) {
-    return {
-      allowed: false,
-      reason: `Spend limit reached: $${totalSpent.toFixed(2)} / $${spendLimit.toFixed(2)}`,
-    };
-  }
-
-  if (strategy.max_buys !== null && strategy.total_buys >= strategy.max_buys) {
-    return {
-      allowed: false,
-      reason: `Max buys reached: ${strategy.total_buys} / ${strategy.max_buys}`,
-    };
+  if (totalSpent >= spendLimit) {
+    return { allowed: false, reason: "Spend limit reached: $" + totalSpent.toFixed(2) + " / $" + spendLimit.toFixed(2) };
   }
 
   if (strategy.chain !== "solana") {
     return { allowed: false, reason: "Chain lock violation: only solana allowed" };
   }
 
-  if (currentPrice > strategy.target_price) {
-    return {
-      allowed: false,
-      reason: `SOL price $${currentPrice} is above target $${strategy.target_price}`,
-    };
-  }
-
   return { allowed: true, reason: null };
 }
 
-export async function executeSwapViaCli(strategy) {
+export async function executeSwapViaCli(strategy, amountPerBuy) {
   const args = [
-    ZERION_CLI,
-    "swap",
-    strategy.from_token,
-    strategy.to_token,
-    strategy.amount_per_buy,
-    "--chain",
-    strategy.chain,
-    "--wallet",
-    strategy.wallet_name,
+    ZERION_CLI, "swap",
+    strategy.from_token, strategy.to_token,
+    String(amountPerBuy),
+    "--chain", strategy.chain,
+    "--wallet", strategy.wallet_name,
     "--json",
   ];
 
@@ -73,7 +49,6 @@ export async function executeSwapViaCli(strategy) {
     });
 
     if (stderr && !stdout) throw new Error(stderr.trim());
-
     const result = JSON.parse(stdout.trim());
     return { success: true, result };
   } catch (err) {
@@ -91,58 +66,77 @@ export async function runDcaExecution(strategy, currentPrice) {
 
   const policy = validatePolicies(strategy, currentPrice);
   if (!policy.allowed) {
-    console.log(`[DCA] Strategy "${strategy.name}" blocked: ${policy.reason}`);
-
-    if (
-      policy.reason.includes("expired") ||
-      policy.reason.includes("Spend limit") ||
-      policy.reason.includes("Max buys")
-    ) {
-      db.prepare(
-        "UPDATE strategies SET status = 'completed', updated_at = datetime('now') WHERE id = ?"
-      ).run(strategy.id);
+    console.log("[DCA] Strategy \"" + strategy.name + "\" blocked: " + policy.reason);
+    if (policy.reason.includes("expired") || policy.reason.includes("Spend limit")) {
+      db.prepare("UPDATE strategies SET status = \'completed\', updated_at = datetime(\'now\') WHERE id = ?").run(strategy.id);
     }
     return { executed: false, reason: policy.reason };
   }
 
-  console.log(
-    `[DCA] Executing: ${strategy.amount_per_buy} ${strategy.from_token} → ${strategy.to_token} @ SOL $${currentPrice}`
-  );
+  const tiers = db.prepare(
+    "SELECT * FROM strategy_tiers WHERE strategy_id = ? AND status = \'active\' ORDER BY target_price DESC"
+  ).all(strategy.id);
 
-  const txRecord = db
-    .prepare(
-      `INSERT INTO transactions (strategy_id, from_token, to_token, amount_in, sol_price_at_execution, status)
-       VALUES (?, ?, ?, ?, ?, 'pending')`
-    )
-    .run(strategy.id, strategy.from_token, strategy.to_token, strategy.amount_per_buy, currentPrice);
-
-  const txId = txRecord.lastInsertRowid;
-  const { success, result, error } = await executeSwapViaCli(strategy);
-
-  if (success) {
-    const txHash = result?.tx?.hash || null;
-    const amountOut = result?.swap?.to || null;
-
-    db.prepare(
-      `UPDATE transactions SET tx_hash = ?, amount_out = ?, status = 'success', executed_at = datetime('now') WHERE id = ?`
-    ).run(txHash, amountOut, txId);
-
-    const newTotalSpent = (
-      parseFloat(strategy.total_spent) + parseFloat(strategy.amount_per_buy)
-    ).toFixed(6);
-
-    db.prepare(
-      `UPDATE strategies SET total_spent = ?, total_buys = total_buys + 1, updated_at = datetime('now') WHERE id = ?`
-    ).run(newTotalSpent, strategy.id);
-
-    console.log(`[DCA] ✅ Swap done. Tx: ${txHash}`);
-    return { executed: true, txHash, amountOut };
-  } else {
-    db.prepare(
-      `UPDATE transactions SET status = 'failed', error = ?, executed_at = datetime('now') WHERE id = ?`
-    ).run(error, txId);
-
-    console.error(`[DCA] ❌ Swap failed: ${error}`);
-    return { executed: false, error };
+  if (tiers.length === 0) {
+    db.prepare("UPDATE strategies SET status = \'completed\', updated_at = datetime(\'now\') WHERE id = ?").run(strategy.id);
+    return { executed: false, reason: "All tiers completed" };
   }
+
+  let anyExecuted = false;
+
+  for (const tier of tiers) {
+    if (currentPrice > tier.target_price) {
+      console.log("[DCA] Tier " + tier.tier_number + " skipped: SOL $" + currentPrice + " > target $" + tier.target_price);
+      continue;
+    }
+
+    const tierSpent = parseFloat(tier.total_spent || "0");
+    const stratTotalSpent = parseFloat(strategy.total_spent || "0");
+    const spendLimit = parseFloat(strategy.spend_limit);
+    const amountPerBuy = parseFloat(tier.amount_per_buy);
+
+    if (stratTotalSpent + amountPerBuy > spendLimit) {
+      console.log("[DCA] Tier " + tier.tier_number + " blocked: would exceed spend limit");
+      continue;
+    }
+
+    console.log("[DCA] Executing tier " + tier.tier_number + ": $" + amountPerBuy + " USDC at SOL $" + currentPrice);
+
+    const txRecord = db.prepare(
+      "INSERT INTO transactions (strategy_id, from_token, to_token, amount_in, sol_price_at_execution, status) VALUES (?, ?, ?, ?, ?, \'pending\')"
+    ).run(strategy.id, strategy.from_token, strategy.to_token, String(amountPerBuy), currentPrice);
+
+    const txId = txRecord.lastInsertRowid;
+    const { success, result, error } = await executeSwapViaCli(strategy, amountPerBuy);
+
+    if (success) {
+      const txHash = result?.tx?.hash || null;
+      const amountOut = result?.swap?.to || null;
+
+      db.prepare("UPDATE transactions SET tx_hash = ?, amount_out = ?, status = \'success\', executed_at = datetime(\'now\') WHERE id = ?").run(txHash, amountOut, txId);
+
+      const newTierSpent = (tierSpent + amountPerBuy).toFixed(6);
+      db.prepare("UPDATE strategy_tiers SET total_spent = ?, total_buys = total_buys + 1 WHERE id = ?").run(newTierSpent, tier.id);
+
+      const newTotalSpent = (stratTotalSpent + amountPerBuy).toFixed(6);
+      db.prepare("UPDATE strategies SET total_spent = ?, total_buys = total_buys + 1, updated_at = datetime(\'now\') WHERE id = ?").run(newTotalSpent, strategy.id);
+
+      console.log("[DCA] Tier " + tier.tier_number + " executed. Tx: " + txHash);
+      anyExecuted = true;
+
+      // Mark tier as completed after one successful buy
+      db.prepare("UPDATE strategy_tiers SET status = \'completed\' WHERE id = ?").run(tier.id);
+
+    } else {
+      db.prepare("UPDATE transactions SET status = \'failed\', error = ?, executed_at = datetime(\'now\') WHERE id = ?").run(error, txId);
+      console.error("[DCA] Tier " + tier.tier_number + " failed: " + error);
+    }
+  }
+
+  const remainingTiers = db.prepare("SELECT COUNT(*) as count FROM strategy_tiers WHERE strategy_id = ? AND status = \'active\'").get(strategy.id);
+  if (remainingTiers.count === 0) {
+    db.prepare("UPDATE strategies SET status = \'completed\', updated_at = datetime(\'now\') WHERE id = ?").run(strategy.id);
+  }
+
+  return { executed: anyExecuted };
 }

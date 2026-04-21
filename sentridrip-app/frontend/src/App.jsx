@@ -150,7 +150,7 @@ export default function App() {
           <Dashboard solPrice={solPrice} onSelect={(id) => navigate("detail", id)} />
         )}
         {page === "create" && (
-          <CreateStrategy onBack={() => navigate("dashboard")} solPrice={solPrice} />
+          <CreateStrategy onBack={() => navigate("dashboard")} solPrice={solPrice} wallets={wallets} />
         )}
         {page === "detail" && selectedId && (
           <StrategyDetail id={selectedId} onBack={() => navigate("dashboard")} />
