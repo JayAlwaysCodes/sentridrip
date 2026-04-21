@@ -19,6 +19,10 @@ export const strategiesApi = {
   policyStatus: (id) => api.get("/strategies/" + id + "/policy-status"),
 };
 
+export const pnlApi = {
+  strategy: (id) => api.get("/pnl/strategy/" + id),
+};
+
 export const walletApi = {
   list: () => api.get("/wallet/list"),
   create: (name, passphrase) => api.post("/wallet/create", { name, passphrase }),

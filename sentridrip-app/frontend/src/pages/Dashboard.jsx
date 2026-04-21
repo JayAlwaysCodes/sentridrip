@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import PriceChart from "../components/PriceChart";
 import { strategiesApi } from "../api";
 
 const STATUS_COLORS = {
@@ -69,6 +70,10 @@ export default function Dashboard({ solPrice, onSelect }) {
 
   return (
     <div className="space-y-8">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-2">
+        <PriceChart height={180} />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Active Strategies", value: totalActive },

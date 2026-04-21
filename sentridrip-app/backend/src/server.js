@@ -7,6 +7,7 @@ import walletRouter from "./routes/wallet.js";
 import priceRouter from "./routes/price.js";
 import { startScheduler } from "./services/scheduler.js";
 import swapRouter from "./routes/swap.js";
+import pnlRouter from "./routes/pnl.js";
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use("/api/strategies", strategiesRouter);
 app.use("/api/wallet", walletRouter);
 app.use("/api/price", priceRouter);
 app.use("/api/swap", swapRouter);
+app.use("/api/pnl", pnlRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", name: "SentriDrip", version: "1.0.0" });

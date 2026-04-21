@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import PriceChart from "../components/PriceChart";
+import PnLPanel from "../components/PnLPanel";
 import { strategiesApi } from "../api";
 
 const STATUS_COLORS = {
@@ -197,6 +199,16 @@ export default function StrategyDetail({ id, onBack }) {
           )}
         </div>
       )}
+
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <h2 className="font-semibold mb-4 text-sm text-gray-400 uppercase tracking-wider">SOL Price Chart</h2>
+        <PriceChart
+          height={200}
+          targetPrices={data.tiers ? data.tiers.map((t) => t.target_price) : [data.target_price]}
+        />
+      </div>
+
+      <PnLPanel strategyId={id} />
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <h2 className="font-semibold mb-4">Transaction History</h2>
