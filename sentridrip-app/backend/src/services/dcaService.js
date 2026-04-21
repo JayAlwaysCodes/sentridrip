@@ -10,14 +10,16 @@ const ZERION_CLI = join(__dirname, "../../../../cli/zerion.js");
 
 export function validatePolicies(strategy, currentPrice) {
   const now = new Date();
-
   const expiry = new Date(strategy.expiry_date);
   if (now > expiry) return { allowed: false, reason: "Strategy has expired" };
 
   const totalSpent = parseFloat(strategy.total_spent || "0");
   const spendLimit = parseFloat(strategy.spend_limit);
   if (totalSpent >= spendLimit) {
-    return { allowed: false, reason: "Spend limit reached: $" + totalSpent.toFixed(2) + " / $" + spendLimit.toFixed(2) };
+    return {
+      allowed: false,
+      reason: "Spend limit reached: $" + totalSpent.toFixed(2) + " / $" + spendLimit.toFixed(2),
+    };
   }
 
   if (strategy.chain !== "solana") {
@@ -66,19 +68,23 @@ export async function runDcaExecution(strategy, currentPrice) {
 
   const policy = validatePolicies(strategy, currentPrice);
   if (!policy.allowed) {
-    console.log("[DCA] Strategy \"" + strategy.name + "\" blocked: " + policy.reason);
+    console.log("[DCA] Strategy blocked: " + policy.reason);
     if (policy.reason.includes("expired") || policy.reason.includes("Spend limit")) {
-      db.prepare("UPDATE strategies SET status = \'completed\', updated_at = datetime(\'now\') WHERE id = ?").run(strategy.id);
+      db.prepare(
+        "UPDATE strategies SET status = ?, updated_at = datetime('now') WHERE id = ?"
+      ).run("completed", strategy.id);
     }
     return { executed: false, reason: policy.reason };
   }
 
   const tiers = db.prepare(
-    "SELECT * FROM strategy_tiers WHERE strategy_id = ? AND status = \'active\' ORDER BY target_price DESC"
-  ).all(strategy.id);
+    "SELECT * FROM strategy_tiers WHERE strategy_id = ? AND status = ? ORDER BY target_price DESC"
+  ).all(strategy.id, "active");
 
   if (tiers.length === 0) {
-    db.prepare("UPDATE strategies SET status = \'completed\', updated_at = datetime(\'now\') WHERE id = ?").run(strategy.id);
+    db.prepare(
+      "UPDATE strategies SET status = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run("completed", strategy.id);
     return { executed: false, reason: "All tiers completed" };
   }
 
@@ -90,7 +96,6 @@ export async function runDcaExecution(strategy, currentPrice) {
       continue;
     }
 
-    const tierSpent = parseFloat(tier.total_spent || "0");
     const stratTotalSpent = parseFloat(strategy.total_spent || "0");
     const spendLimit = parseFloat(strategy.spend_limit);
     const amountPerBuy = parseFloat(tier.amount_per_buy);
@@ -100,11 +105,11 @@ export async function runDcaExecution(strategy, currentPrice) {
       continue;
     }
 
-    console.log("[DCA] Executing tier " + tier.tier_number + ": $" + amountPerBuy + " USDC at SOL $" + currentPrice);
+    console.log("[DCA] Executing tier " + tier.tier_number + ": $" + amountPerBuy + " at SOL $" + currentPrice);
 
     const txRecord = db.prepare(
-      "INSERT INTO transactions (strategy_id, from_token, to_token, amount_in, sol_price_at_execution, status) VALUES (?, ?, ?, ?, ?, \'pending\')"
-    ).run(strategy.id, strategy.from_token, strategy.to_token, String(amountPerBuy), currentPrice);
+      "INSERT INTO transactions (strategy_id, from_token, to_token, amount_in, sol_price_at_execution, status) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(strategy.id, strategy.from_token, strategy.to_token, String(amountPerBuy), currentPrice, "pending");
 
     const txId = txRecord.lastInsertRowid;
     const { success, result, error } = await executeSwapViaCli(strategy, amountPerBuy);
@@ -113,29 +118,38 @@ export async function runDcaExecution(strategy, currentPrice) {
       const txHash = result?.tx?.hash || null;
       const amountOut = result?.swap?.to || null;
 
-      db.prepare("UPDATE transactions SET tx_hash = ?, amount_out = ?, status = \'success\', executed_at = datetime(\'now\') WHERE id = ?").run(txHash, amountOut, txId);
+      db.prepare(
+        "UPDATE transactions SET tx_hash = ?, amount_out = ?, status = ?, executed_at = datetime('now') WHERE id = ?"
+      ).run(txHash, amountOut, "success", txId);
 
-      const newTierSpent = (tierSpent + amountPerBuy).toFixed(6);
-      db.prepare("UPDATE strategy_tiers SET total_spent = ?, total_buys = total_buys + 1 WHERE id = ?").run(newTierSpent, tier.id);
+      const tierSpent = parseFloat(tier.total_spent || "0");
+      db.prepare(
+        "UPDATE strategy_tiers SET total_spent = ?, total_buys = total_buys + 1, status = ? WHERE id = ?"
+      ).run((tierSpent + amountPerBuy).toFixed(6), "completed", tier.id);
 
-      const newTotalSpent = (stratTotalSpent + amountPerBuy).toFixed(6);
-      db.prepare("UPDATE strategies SET total_spent = ?, total_buys = total_buys + 1, updated_at = datetime(\'now\') WHERE id = ?").run(newTotalSpent, strategy.id);
+      db.prepare(
+        "UPDATE strategies SET total_spent = ?, total_buys = total_buys + 1, updated_at = datetime('now') WHERE id = ?"
+      ).run((stratTotalSpent + amountPerBuy).toFixed(6), strategy.id);
 
       console.log("[DCA] Tier " + tier.tier_number + " executed. Tx: " + txHash);
       anyExecuted = true;
 
-      // Mark tier as completed after one successful buy
-      db.prepare("UPDATE strategy_tiers SET status = \'completed\' WHERE id = ?").run(tier.id);
-
     } else {
-      db.prepare("UPDATE transactions SET status = \'failed\', error = ?, executed_at = datetime(\'now\') WHERE id = ?").run(error, txId);
+      db.prepare(
+        "UPDATE transactions SET status = ?, error = ?, executed_at = datetime('now') WHERE id = ?"
+      ).run("failed", error, txId);
       console.error("[DCA] Tier " + tier.tier_number + " failed: " + error);
     }
   }
 
-  const remainingTiers = db.prepare("SELECT COUNT(*) as count FROM strategy_tiers WHERE strategy_id = ? AND status = \'active\'").get(strategy.id);
-  if (remainingTiers.count === 0) {
-    db.prepare("UPDATE strategies SET status = \'completed\', updated_at = datetime(\'now\') WHERE id = ?").run(strategy.id);
+  const remaining = db.prepare(
+    "SELECT COUNT(*) as count FROM strategy_tiers WHERE strategy_id = ? AND status = ?"
+  ).get(strategy.id, "active");
+
+  if (remaining.count === 0) {
+    db.prepare(
+      "UPDATE strategies SET status = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run("completed", strategy.id);
   }
 
   return { executed: anyExecuted };

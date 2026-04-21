@@ -134,8 +134,12 @@ export default function Dashboard({ solPrice, onSelect }) {
                         <p className="text-white font-mono">${s.amount_per_buy} USDC</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-600">Target price</p>
-                        <p className="text-white font-mono">${s.target_price}</p>
+                        <p className="text-xs text-gray-600">Price tiers</p>
+                        <p className="text-white font-mono">
+                          {s.tiers && s.tiers.length > 1
+                            ? s.tiers.length + " tiers"
+                            : "$" + s.target_price}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-600">Buys done</p>
