@@ -18,6 +18,166 @@ function CopyButton({ text }) {
   );
 }
 
+
+function SendModal({ wallet, onClose }) {
+  const [form, setForm] = useState({ token: "SOL", toAddress: "", amount: "" });
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const friendlyError = (raw) => {
+    if (!raw) return "Send failed. Please try again.";
+    const msg = raw.toLowerCase();
+    if (msg.includes("insufficient") || msg.includes("balance")) return "Insufficient " + form.token + " balance in wallet.";
+    if (msg.includes("not funded") || msg.includes("400")) return "Wallet not funded on mainnet yet.";
+    if (msg.includes("agent") || msg.includes("api key")) return "Agent token missing or expired.";
+    if (msg.includes("network") || msg.includes("fetch")) return "Network error. Check connection and try again.";
+    if (msg.includes("invalid") && msg.includes("address")) return "Invalid Solana address. Please double-check.";
+    return raw.length > 100 ? raw.slice(0, 100) + "..." : raw;
+  };
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setResult(null);
+    setLoading(true);
+    try {
+      const res = await walletApi.send({
+        walletName: wallet.name,
+        token: form.token,
+        toAddress: form.toAddress,
+        amount: form.amount,
+        chain: "solana",
+      });
+      setResult(res.data.data);
+    } catch (e) {
+      setError(friendlyError(e.response?.data?.error || e.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const solscanUrl = result && result.hash ? "https://solscan.io/tx/" + result.hash : null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+          <div>
+            <h2 className="font-bold text-lg">Send / Withdraw</h2>
+            <p className="text-xs text-gray-500 mt-0.5">From: {wallet.name}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl">x</button>
+        </div>
+        <div className="p-6">
+          {!result ? (
+            <form onSubmit={handleSend} className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">Token</label>
+                <div className="flex gap-2">
+                  {["SOL", "USDC"].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => set("token", t)}
+                      className={"flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors " +
+                        (form.token === t
+                          ? "border-cyan-500 bg-cyan-500/10 text-cyan-400"
+                          : "border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600")}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">Recipient Solana Address</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dmo7nNVD5J3Afo8TxXvChQ..."
+                  value={form.toAddress}
+                  onChange={(e) => set("toAddress", e.target.value)}
+                  required
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-cyan-500 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">Amount ({form.token})</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  min="0.000001"
+                  placeholder="0.00"
+                  value={form.amount}
+                  onChange={(e) => set("amount", e.target.value)}
+                  required
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+                />
+              </div>
+
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-xs text-yellow-400">
+                Double-check the recipient address. Blockchain transactions are irreversible.
+              </div>
+
+              {error && (
+                <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 text-red-400 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 py-2.5 rounded-xl text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
+                >
+                  {loading ? "Sending..." : "Send " + form.token}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4 text-center">
+              <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+                <span className="text-green-400 text-xl">OK</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-green-400">Transaction Sent!</h3>
+                <p className="text-gray-400 text-sm mt-1">
+                  {form.amount + " " + form.token + " sent successfully"}
+                </p>
+              </div>
+              {solscanUrl && (
+                <button
+                  onClick={() => window.open(solscanUrl, "_blank")}
+                  className="text-xs text-cyan-400 hover:underline font-mono block mx-auto"
+                >
+                  {result.hash.slice(0, 16) + "... View on Solscan"}
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="w-full bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-bold py-2.5 rounded-xl transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CreateWalletModal({ onClose, onCreated }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ name: "", passphrase: "", confirm: "" });
@@ -226,10 +386,17 @@ function PortfolioPanel({ walletName, solAddr }) {
 
 export default function WalletPage({ wallets, activeWallet, onWalletSelect, onWalletsUpdated }) {
   const [showCreate, setShowCreate] = useState(false);
+  const [showSend, setShowSend] = useState(false);
   const shortAddr = (addr) => addr ? addr.slice(0, 6) + "..." + addr.slice(-6) : null;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {showSend && activeWallet && (
+        <SendModal
+          wallet={activeWallet}
+          onClose={() => setShowSend(false)}
+        />
+      )}
       {showCreate && (
         <CreateWalletModal
           onClose={() => setShowCreate(false)}
@@ -242,12 +409,22 @@ export default function WalletPage({ wallets, activeWallet, onWalletSelect, onWa
           <h1 className="text-2xl font-bold">Wallet Manager</h1>
           <p className="text-gray-400 text-sm mt-1">Manage your wallets and view your Solana portfolio</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
-        >
-          + New Wallet
-        </button>
+        <div className="flex gap-2">
+          {activeWallet && (
+            <button
+              onClick={() => setShowSend(true)}
+              className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
+            >
+              Send / Withdraw
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreate(true)}
+            className="bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
+          >
+            + New Wallet
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
