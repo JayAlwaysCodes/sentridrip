@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import cors from "cors";
 import dotenv from "dotenv";
 import { initDb } from "./db/database.js";
@@ -13,6 +14,15 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Too many requests. Please slow down." },
+});
+app.use("/api/", limiter);
 
 app.use(cors({
   origin: [

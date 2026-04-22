@@ -321,7 +321,14 @@ export default function CreateStrategy({ onBack, solPrice, wallets: propWallets 
         </section>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 text-red-400 text-sm">{error}</div>
+          <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 text-sm">
+            <p className="text-red-400">{error}</p>
+            {error.includes("Insufficient USDC") && (
+              <p className="text-yellow-400 mt-2 text-xs">
+                Send USDC (SPL) to your Solana address to fund your wallet, then try again.
+              </p>
+            )}
+          </div>
         )}
 
         <div className="flex gap-3">

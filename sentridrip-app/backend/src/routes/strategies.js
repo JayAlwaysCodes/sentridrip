@@ -2,15 +2,55 @@ import { Router } from "express";
 import { getDb } from "../db/database.js";
 import { validatePolicies } from "../services/dcaService.js";
 import { getLastKnownPrice } from "../services/priceService.js";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const execFileAsync = promisify(execFile);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ZERION_CLI = join(__dirname, "../../../../cli/zerion.js");
 
 const router = Router();
+
+async function getWalletUsdcBalance(walletName) {
+  try {
+    const { stdout } = await execFileAsync(
+      "node",
+      [ZERION_CLI, "positions", "--wallet", walletName, "--chain", "solana", "--json"],
+      {
+        timeout: 15_000,
+        env: {
+          ...process.env,
+          ZERION_API_KEY: process.env.ZERION_API_KEY,
+          ZERION_AGENT_TOKEN: process.env.ZERION_AGENT_TOKEN,
+          SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
+        },
+      }
+    );
+    const result = JSON.parse(stdout.trim());
+    const positions = result.data || result || [];
+    const usdc = positions.find((p) => {
+      const attr = p.attributes || p;
+      const symbol = attr.fungible_info?.symbol || attr.symbol || "";
+      return symbol.toUpperCase() === "USDC";
+    });
+    if (!usdc) return 0;
+    const attr = usdc.attributes || usdc;
+    return parseFloat(attr.quantity?.float || 0);
+  } catch (_) {
+    return null;
+  }
+}
 
 router.get("/", (req, res) => {
   try {
     const db = getDb();
     const strategies = db.prepare("SELECT * FROM strategies ORDER BY created_at DESC").all();
     const result = strategies.map((s) => {
-      const tiers = db.prepare("SELECT * FROM strategy_tiers WHERE strategy_id = ? ORDER BY target_price DESC").all(s.id);
+      const tiers = db.prepare(
+        "SELECT * FROM strategy_tiers WHERE strategy_id = ? ORDER BY target_price DESC"
+      ).all(s.id);
       return { ...s, tiers };
     });
     res.json({ success: true, data: result });
@@ -24,15 +64,19 @@ router.get("/:id", (req, res) => {
     const db = getDb();
     const strategy = db.prepare("SELECT * FROM strategies WHERE id = ?").get(req.params.id);
     if (!strategy) return res.status(404).json({ success: false, error: "Strategy not found" });
-    const transactions = db.prepare("SELECT * FROM transactions WHERE strategy_id = ? ORDER BY executed_at DESC LIMIT 50").all(strategy.id);
-    const tiers = db.prepare("SELECT * FROM strategy_tiers WHERE strategy_id = ? ORDER BY target_price DESC").all(strategy.id);
+    const transactions = db.prepare(
+      "SELECT * FROM transactions WHERE strategy_id = ? ORDER BY executed_at DESC LIMIT 50"
+    ).all(strategy.id);
+    const tiers = db.prepare(
+      "SELECT * FROM strategy_tiers WHERE strategy_id = ? ORDER BY target_price DESC"
+    ).all(strategy.id);
     res.json({ success: true, data: { ...strategy, transactions, tiers } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const {
       name, wallet_name, spend_limit, expiry_date,
@@ -40,8 +84,15 @@ router.post("/", (req, res) => {
       tiers = [],
     } = req.body;
 
-    if (!name || !wallet_name || !spend_limit || !expiry_date) {
-      return res.status(400).json({ success: false, error: "Missing required fields: name, wallet_name, spend_limit, expiry_date" });
+    // Input sanitization
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return res.status(400).json({ success: false, error: "Strategy name is required" });
+    }
+    if (!wallet_name || typeof wallet_name !== "string" || !/^[a-zA-Z0-9_-]+$/.test(wallet_name)) {
+      return res.status(400).json({ success: false, error: "Invalid wallet name" });
+    }
+    if (!spend_limit || !expiry_date) {
+      return res.status(400).json({ success: false, error: "spend_limit and expiry_date are required" });
     }
     if (!tiers || tiers.length === 0) {
       return res.status(400).json({ success: false, error: "At least one price tier is required" });
@@ -49,31 +100,80 @@ router.post("/", (req, res) => {
     if (tiers.length > 5) {
       return res.status(400).json({ success: false, error: "Maximum 5 tiers allowed" });
     }
-    for (const t of tiers) {
+
+    // Validate each tier
+    for (let i = 0; i < tiers.length; i++) {
+      const t = tiers[i];
       if (!t.target_price || !t.amount_per_buy) {
-        return res.status(400).json({ success: false, error: "Each tier needs a target_price and amount_per_buy" });
+        return res.status(400).json({ success: false, error: "Tier " + (i + 1) + " needs a target price and amount" });
       }
-      if (parseFloat(t.target_price) <= 0 || parseFloat(t.amount_per_buy) <= 0) {
-        return res.status(400).json({ success: false, error: "Tier prices and amounts must be positive" });
+      if (parseFloat(t.target_price) <= 0) {
+        return res.status(400).json({ success: false, error: "Tier " + (i + 1) + " target price must be positive" });
+      }
+      if (parseFloat(t.amount_per_buy) < 1) {
+        return res.status(400).json({ success: false, error: "Tier " + (i + 1) + " minimum amount is $1 USDC" });
       }
     }
 
+    // Check for duplicate tier prices
+    const tierPrices = tiers.map((t) => parseFloat(t.target_price));
+    const uniquePrices = new Set(tierPrices);
+    if (uniquePrices.size !== tierPrices.length) {
+      return res.status(400).json({ success: false, error: "Each tier must have a unique target price" });
+    }
+
+    // Check tiers are in descending order
+    for (let i = 1; i < tierPrices.length; i++) {
+      if (tierPrices[i] >= tierPrices[i - 1]) {
+        return res.status(400).json({
+          success: false,
+          error: "Tier prices must be in descending order (Tier 1 highest, last tier lowest)",
+        });
+      }
+    }
+
+    // Validate expiry
+    if (new Date(expiry_date) <= new Date()) {
+      return res.status(400).json({ success: false, error: "Expiry date must be in the future" });
+    }
+
+    // Calculate total spend
     const totalTierAmount = tiers.reduce((sum, t) => sum + parseFloat(t.amount_per_buy), 0);
     if (totalTierAmount > parseFloat(spend_limit)) {
-      return res.status(400).json({ success: false, error: "Total tier amounts ($" + totalTierAmount.toFixed(2) + ") exceed spend limit ($" + parseFloat(spend_limit).toFixed(2) + ")" });
-    }
-    if (new Date(expiry_date) <= new Date()) {
-      return res.status(400).json({ success: false, error: "expiry_date must be in the future" });
+      return res.status(400).json({
+        success: false,
+        error: "Total tier amounts ($" + totalTierAmount.toFixed(2) + ") exceed spend limit ($" + parseFloat(spend_limit).toFixed(2) + ")",
+      });
     }
 
-    const lowestTier = tiers.reduce((min, t) => parseFloat(t.target_price) < parseFloat(min.target_price) ? t : min, tiers[0]);
-    const highestAmount = tiers.reduce((max, t) => parseFloat(t.amount_per_buy) > parseFloat(max.amount_per_buy) ? t : max, tiers[0]);
+    // Check wallet USDC balance
+    const usdcBalance = await getWalletUsdcBalance(wallet_name);
+    if (usdcBalance !== null && usdcBalance < totalTierAmount) {
+      return res.status(400).json({
+        success: false,
+        error: "Insufficient USDC balance. Wallet has $" + usdcBalance.toFixed(2) + " USDC but strategy needs $" + totalTierAmount.toFixed(2) + ". Please fund your wallet first.",
+        insufficientFunds: true,
+        walletBalance: usdcBalance.toFixed(2),
+        required: totalTierAmount.toFixed(2),
+      });
+    }
+
+    const lowestTier = tiers.reduce((min, t) =>
+      parseFloat(t.target_price) < parseFloat(min.target_price) ? t : min, tiers[0]);
+    const highestAmount = tiers.reduce((max, t) =>
+      parseFloat(t.amount_per_buy) > parseFloat(max.amount_per_buy) ? t : max, tiers[0]);
 
     const db = getDb();
     const result = db.prepare(
       `INSERT INTO strategies (name, wallet_name, from_token, to_token, amount_per_buy, target_price, spend_limit, expiry_date, chain)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(name, wallet_name, from_token, to_token, String(highestAmount.amount_per_buy), parseFloat(lowestTier.target_price), String(spend_limit), expiry_date, chain);
+    ).run(
+      name.trim(), wallet_name, from_token, to_token,
+      String(highestAmount.amount_per_buy),
+      parseFloat(lowestTier.target_price),
+      String(totalTierAmount.toFixed(2)),
+      expiry_date, chain
+    );
 
     const strategyId = result.lastInsertRowid;
 
@@ -86,7 +186,9 @@ router.post("/", (req, res) => {
     }
 
     const strategy = db.prepare("SELECT * FROM strategies WHERE id = ?").get(strategyId);
-    const savedTiers = db.prepare("SELECT * FROM strategy_tiers WHERE strategy_id = ? ORDER BY target_price DESC").all(strategyId);
+    const savedTiers = db.prepare(
+      "SELECT * FROM strategy_tiers WHERE strategy_id = ? ORDER BY target_price DESC"
+    ).all(strategyId);
 
     res.status(201).json({ success: true, data: { ...strategy, tiers: savedTiers } });
   } catch (err) {
@@ -99,8 +201,12 @@ router.patch("/:id/pause", (req, res) => {
     const db = getDb();
     const s = db.prepare("SELECT * FROM strategies WHERE id = ?").get(req.params.id);
     if (!s) return res.status(404).json({ success: false, error: "Not found" });
-    if (s.status === "completed") return res.status(400).json({ success: false, error: "Cannot pause completed strategy" });
-    db.prepare("UPDATE strategies SET status = 'paused', updated_at = datetime('now') WHERE id = ?").run(req.params.id);
+    if (s.status === "completed") {
+      return res.status(400).json({ success: false, error: "Cannot pause a completed strategy" });
+    }
+    db.prepare(
+      "UPDATE strategies SET status = 'paused', updated_at = datetime('now') WHERE id = ?"
+    ).run(req.params.id);
     res.json({ success: true, data: { id: req.params.id, status: "paused" } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -112,8 +218,12 @@ router.patch("/:id/resume", (req, res) => {
     const db = getDb();
     const s = db.prepare("SELECT * FROM strategies WHERE id = ?").get(req.params.id);
     if (!s) return res.status(404).json({ success: false, error: "Not found" });
-    if (s.status === "completed") return res.status(400).json({ success: false, error: "Cannot resume completed strategy" });
-    db.prepare("UPDATE strategies SET status = 'active', updated_at = datetime('now') WHERE id = ?").run(req.params.id);
+    if (s.status === "completed") {
+      return res.status(400).json({ success: false, error: "Cannot resume a completed strategy" });
+    }
+    db.prepare(
+      "UPDATE strategies SET status = 'active', updated_at = datetime('now') WHERE id = ?"
+    ).run(req.params.id);
     res.json({ success: true, data: { id: req.params.id, status: "active" } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -139,16 +249,21 @@ router.get("/:id/policy-status", (req, res) => {
     const db = getDb();
     const strategy = db.prepare("SELECT * FROM strategies WHERE id = ?").get(req.params.id);
     if (!strategy) return res.status(404).json({ success: false, error: "Not found" });
-    const tiers = db.prepare("SELECT * FROM strategy_tiers WHERE strategy_id = ? ORDER BY target_price DESC").all(strategy.id);
+
+    const tiers = db.prepare(
+      "SELECT * FROM strategy_tiers WHERE strategy_id = ? ORDER BY target_price DESC"
+    ).all(strategy.id);
 
     const currentPrice = getLastKnownPrice();
-    if (!currentPrice) return res.json({ success: true, data: { status: "unknown", reason: "Price not yet fetched" } });
+    if (!currentPrice) {
+      return res.json({ success: true, data: { status: "unknown", reason: "Price not yet fetched" } });
+    }
 
     const policy = validatePolicies(strategy, currentPrice);
     const totalSpent = parseFloat(strategy.total_spent || "0");
     const spendLimit = parseFloat(strategy.spend_limit);
 
-    const activeTiers = tiers.map((t) => ({
+    const tierStatus = tiers.map((t) => ({
       tier: t.tier_number,
       targetPrice: t.target_price,
       amountPerBuy: t.amount_per_buy,
@@ -158,13 +273,15 @@ router.get("/:id/policy-status", (req, res) => {
       priceConditionMet: currentPrice <= t.target_price,
     }));
 
+    const anyTierActive = tierStatus.some((t) => t.priceConditionMet && t.status === "active");
+
     res.json({
       success: true,
       data: {
         allowed: policy.allowed,
         reason: policy.reason,
         currentPrice,
-        priceConditionMet: currentPrice <= strategy.target_price,
+        priceConditionMet: anyTierActive,
         spendProgress: {
           spent: totalSpent,
           limit: spendLimit,
@@ -173,7 +290,7 @@ router.get("/:id/policy-status", (req, res) => {
         },
         expiresAt: strategy.expiry_date,
         isExpired: new Date(strategy.expiry_date) <= new Date(),
-        tiers: activeTiers,
+        tiers: tierStatus,
       },
     });
   } catch (err) {

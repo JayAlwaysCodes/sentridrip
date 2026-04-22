@@ -126,11 +126,19 @@ export default function Dashboard({ solPrice, onSelect }) {
                         <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[s.status]}`} />
                         {s.status}
                       </span>
-                      {solPrice && s.status === "active" && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${priceCondition ? "bg-green-500/20 text-green-400" : "bg-gray-700 text-gray-400"}`}>
-                          {priceCondition ? "🎯 Target hit!" : `Target: $${s.target_price}`}
-                        </span>
-                      )}
+                      {solPrice && s.status === "active" && (() => {
+                        const activeTierHit = s.tiers && s.tiers.length > 0
+                          ? s.tiers.some((t) => t.status === "active" && solPrice <= t.target_price)
+                          : solPrice <= s.target_price;
+                        const lowestTarget = s.tiers && s.tiers.length > 0
+                          ? Math.min(...s.tiers.filter((t) => t.status === "active").map((t) => t.target_price))
+                          : s.target_price;
+                        return (
+                          <span className={"text-xs px-2 py-0.5 rounded-full " + (activeTierHit ? "bg-green-500/20 text-green-400" : "bg-gray-700 text-gray-400")}>
+                            {activeTierHit ? "Target hit!" : "Next target: $" + lowestTarget}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-gray-400 mb-3">
