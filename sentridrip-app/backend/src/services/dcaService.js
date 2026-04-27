@@ -54,10 +54,22 @@ export async function executeSwapViaCli(strategy, amountPerBuy) {
     const result = JSON.parse(stdout.trim());
     return { success: true, result };
   } catch (err) {
-    let message = err.message;
+    let message = "Swap execution failed";
     try {
-      const parsed = JSON.parse(err.stdout || err.message);
-      message = parsed?.error?.message || message;
+      const combined = (err.stdout || "") + (err.message || "");
+      const match = combined.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        message = parsed?.error?.message || message;
+      }
+      if (message === "Swap execution failed") {
+        if (combined.includes("fetch failed") || combined.includes("400")) message = "Wallet not funded on mainnet";
+        else if (combined.includes("insufficient") || combined.includes("balance")) message = "Insufficient USDC balance";
+        else if (combined.includes("no_route") || combined.includes("No swap route")) message = "No swap route found";
+        else if (combined.includes("agent") || combined.includes("API key")) message = "Agent token missing or expired";
+        else if (combined.includes("429")) message = "Rate limit reached, will retry";
+        else if (combined.includes("timeout")) message = "Transaction timed out";
+      }
     } catch (_) {}
     return { success: false, error: message };
   }
