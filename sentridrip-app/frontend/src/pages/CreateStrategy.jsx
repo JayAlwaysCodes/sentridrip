@@ -321,12 +321,23 @@ export default function CreateStrategy({ onBack, solPrice, wallets: propWallets 
         </section>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 text-sm">
-            <p className="text-red-400">{error}</p>
-            {error.includes("Insufficient USDC") && (
-              <p className="text-yellow-400 mt-2 text-xs">
-                Send USDC (SPL) to your Solana address to fund your wallet, then try again.
-              </p>
+          <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 text-sm space-y-2">
+            <p className="text-red-400 font-medium">{error}</p>
+            {(error.toLowerCase().includes("usdc") || error.toLowerCase().includes("balance") || error.toLowerCase().includes("fund")) && selectedWallet && selectedWallet.solAddress && (
+              <div className="bg-gray-800 rounded-lg p-3 mt-2">
+                <p className="text-xs text-gray-400 mb-1">Send USDC (SPL) on Solana network to:</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-xs text-cyan-400 break-all flex-1">{selectedWallet.solAddress}</p>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(selectedWallet.solAddress)}
+                    className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded shrink-0"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600 mt-1">Same address accepts both SOL and USDC</p>
+              </div>
             )}
           </div>
         )}

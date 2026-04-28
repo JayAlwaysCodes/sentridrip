@@ -15,7 +15,7 @@ const router = Router();
 
 async function getWalletUsdcBalance(walletName) {
   try {
-    const { stdout } = await execFileAsync(
+    const { stdout, stderr } = await execFileAsync(
       "node",
       [ZERION_CLI, "positions", "--wallet", walletName, "--chain", "solana", "--json"],
       {
@@ -28,18 +28,47 @@ async function getWalletUsdcBalance(walletName) {
         },
       }
     );
-    const result = JSON.parse(stdout.trim());
-    const positions = result.data || result || [];
+
+    const raw = stdout.trim();
+    if (!raw) return { balance: 0, error: "No response from wallet" };
+
+    const parsed = JSON.parse(raw);
+
+    // Check if CLI returned an error
+    if (parsed.error) {
+      return { balance: 0, error: parsed.error.message || "Could not fetch wallet balance" };
+    }
+
+    const positions = parsed.data || parsed || [];
+
+    // Empty positions means wallet exists but has no tokens
+    if (!Array.isArray(positions) || positions.length === 0) {
+      return { balance: 0, error: null };
+    }
+
     const usdc = positions.find((p) => {
       const attr = p.attributes || p;
       const symbol = attr.fungible_info?.symbol || attr.symbol || "";
       return symbol.toUpperCase() === "USDC";
     });
-    if (!usdc) return 0;
+
+    if (!usdc) return { balance: 0, error: null };
+
     const attr = usdc.attributes || usdc;
-    return parseFloat(attr.quantity?.float || 0);
-  } catch (_) {
-    return null;
+    const balance = parseFloat(attr.quantity?.float || 0);
+    return { balance, error: null };
+  } catch (err) {
+    // If stdout has JSON error, extract it
+    try {
+      const match = (err.stdout || "").match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        if (parsed.error) {
+          return { balance: 0, error: parsed.error.message || "Wallet fetch failed" };
+        }
+      }
+    } catch (_) {}
+    return { balance: 0, error: "Could not connect to wallet. Check your API key and wallet name." };
   }
 }
 
@@ -146,12 +175,33 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Check wallet USDC balance
-    const usdcBalance = await getWalletUsdcBalance(wallet_name);
-    if (usdcBalance !== null && usdcBalance < totalTierAmount) {
+    // Check wallet USDC balance — always enforce, never skip
+    const { balance: usdcBalance, error: balanceError } = await getWalletUsdcBalance(wallet_name);
+
+    if (balanceError) {
       return res.status(400).json({
         success: false,
-        error: "Insufficient USDC balance. Wallet has $" + usdcBalance.toFixed(2) + " USDC but strategy needs $" + totalTierAmount.toFixed(2) + ". Please fund your wallet first.",
+        error: "Could not verify wallet balance: " + balanceError + ". Please make sure your wallet is funded on Solana mainnet before creating a strategy.",
+        insufficientFunds: true,
+        walletBalance: "0.00",
+        required: totalTierAmount.toFixed(2),
+      });
+    }
+
+    if (usdcBalance <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Your wallet has no USDC balance. Please send USDC (SPL) to your Solana address before creating a strategy.",
+        insufficientFunds: true,
+        walletBalance: "0.00",
+        required: totalTierAmount.toFixed(2),
+      });
+    }
+
+    if (usdcBalance < totalTierAmount) {
+      return res.status(400).json({
+        success: false,
+        error: "Insufficient USDC balance. Wallet has $" + usdcBalance.toFixed(2) + " USDC but this strategy needs $" + totalTierAmount.toFixed(2) + ". Reduce your tier amounts or fund your wallet.",
         insufficientFunds: true,
         walletBalance: usdcBalance.toFixed(2),
         required: totalTierAmount.toFixed(2),
