@@ -3,6 +3,11 @@ import { promisify } from "util";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { getDb } from "../db/database.js";
+import {
+  notifySwapSuccess,
+  notifySwapFailed,
+  notifyStrategyCompleted,
+} from "./telegramService.js";
 
 const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -85,6 +90,12 @@ export async function runDcaExecution(strategy, currentPrice) {
       db.prepare(
         "UPDATE strategies SET status = ?, updated_at = datetime('now') WHERE id = ?"
       ).run("completed", strategy.id);
+
+      await notifyStrategyCompleted({
+        name: strategy.name,
+        totalSpent: strategy.total_spent,
+        totalBuys: strategy.total_buys,
+      }).catch(() => {});
     }
     return { executed: false, reason: policy.reason };
   }
@@ -97,6 +108,13 @@ export async function runDcaExecution(strategy, currentPrice) {
     db.prepare(
       "UPDATE strategies SET status = ?, updated_at = datetime('now') WHERE id = ?"
     ).run("completed", strategy.id);
+
+    await notifyStrategyCompleted({
+      name: strategy.name,
+      totalSpent: strategy.total_spent,
+      totalBuys: strategy.total_buys,
+    }).catch(() => {});
+
     return { executed: false, reason: "All tiers completed" };
   }
 
@@ -128,7 +146,7 @@ export async function runDcaExecution(strategy, currentPrice) {
 
     if (success) {
       const txHash = result?.tx?.hash || null;
-      const amountOut = result?.swap?.to || null;
+      const amountOut = result?.swap?.to || "unknown";
 
       db.prepare(
         "UPDATE transactions SET tx_hash = ?, amount_out = ?, status = ?, executed_at = datetime('now') WHERE id = ?"
@@ -143,6 +161,15 @@ export async function runDcaExecution(strategy, currentPrice) {
         "UPDATE strategies SET total_spent = ?, total_buys = total_buys + 1, updated_at = datetime('now') WHERE id = ?"
       ).run((stratTotalSpent + amountPerBuy).toFixed(6), strategy.id);
 
+      await notifySwapSuccess({
+        strategyName: strategy.name,
+        tierNumber: tier.tier_number,
+        amountIn: amountPerBuy.toFixed(2),
+        amountOut: amountOut,
+        solPrice: currentPrice.toFixed(2),
+        txHash,
+      }).catch(() => {});
+
       console.log("[DCA] Tier " + tier.tier_number + " executed. Tx: " + txHash);
       anyExecuted = true;
 
@@ -150,6 +177,15 @@ export async function runDcaExecution(strategy, currentPrice) {
       db.prepare(
         "UPDATE transactions SET status = ?, error = ?, executed_at = datetime('now') WHERE id = ?"
       ).run("failed", error, txId);
+
+      await notifySwapFailed({
+        strategyName: strategy.name,
+        tierNumber: tier.tier_number,
+        amountIn: amountPerBuy.toFixed(2),
+        solPrice: currentPrice.toFixed(2),
+        error,
+      }).catch(() => {});
+
       console.error("[DCA] Tier " + tier.tier_number + " failed: " + error);
     }
   }
@@ -162,6 +198,12 @@ export async function runDcaExecution(strategy, currentPrice) {
     db.prepare(
       "UPDATE strategies SET status = ?, updated_at = datetime('now') WHERE id = ?"
     ).run("completed", strategy.id);
+
+    await notifyStrategyCompleted({
+      name: strategy.name,
+      totalSpent: strategy.total_spent,
+      totalBuys: strategy.total_buys,
+    }).catch(() => {});
   }
 
   return { executed: anyExecuted };

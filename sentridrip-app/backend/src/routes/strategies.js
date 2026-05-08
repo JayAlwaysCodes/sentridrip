@@ -3,6 +3,7 @@ import { getDb } from "../db/database.js";
 import { validatePolicies } from "../services/dcaService.js";
 import { getLastKnownPrice } from "../services/priceService.js";
 import { execFile } from "child_process";
+import { notifyStrategyCreated } from "../services/telegramService.js";
 import { promisify } from "util";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -239,6 +240,13 @@ router.post("/", async (req, res) => {
     const savedTiers = db.prepare(
       "SELECT * FROM strategy_tiers WHERE strategy_id = ? ORDER BY target_price DESC"
     ).all(strategyId);
+
+    notifyStrategyCreated({
+      name: name.trim(),
+      tiers: savedTiers,
+      spendLimit: totalTierAmount.toFixed(2),
+      expiryDate: expiry_date,
+    }).catch(() => {});
 
     res.status(201).json({ success: true, data: { ...strategy, tiers: savedTiers } });
   } catch (err) {

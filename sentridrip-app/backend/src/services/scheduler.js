@@ -2,15 +2,18 @@ import cron from "node-cron";
 import { getSolPrice } from "./priceService.js";
 import { runDcaExecution } from "./dcaService.js";
 import { getDb } from "../db/database.js";
+import { notifyStartup, notifyPriceCheck } from "./telegramService.js";
 
 let _isRunning = false;
 
 export function startScheduler() {
   if (!process.env.ZERION_API_KEY) {
-    console.warn("[Scheduler] WARNING: ZERION_API_KEY not set. Scheduler will run but swaps will fail.");
+    console.warn("[Scheduler] WARNING: ZERION_API_KEY not set.");
   }
 
   console.log("[Scheduler] Starting DCA price monitor (every 60s)...");
+
+  notifyStartup().catch(() => {});
 
   cron.schedule("* * * * *", async () => {
     if (_isRunning) {
@@ -32,6 +35,24 @@ export function startScheduler() {
 
       console.log("[Scheduler] Checking " + activeStrategies.length + " active strategy(ies)...");
 
+      let totalTiersReady = 0;
+      for (const strategy of activeStrategies) {
+        const tiers = db.prepare(
+          "SELECT * FROM strategy_tiers WHERE strategy_id = ? AND status = ? ORDER BY target_price DESC"
+        ).all(strategy.id, "active");
+
+        const tiersReady = tiers.filter((t) => currentPrice <= t.target_price).length;
+        totalTiersReady += tiersReady;
+      }
+
+      if (totalTiersReady > 0) {
+        await notifyPriceCheck({
+          solPrice: currentPrice.toFixed(2),
+          strategiesChecked: activeStrategies.length,
+          tiersReady: totalTiersReady,
+        });
+      }
+
       for (const strategy of activeStrategies) {
         try {
           await runDcaExecution(strategy, currentPrice);
@@ -40,7 +61,7 @@ export function startScheduler() {
         }
       }
 
-      // Cleanup price history older than 24 hours to prevent unbounded growth
+      // Cleanup price history older than 24 hours
       db.prepare(
         "DELETE FROM price_history WHERE recorded_at < datetime('now', '-24 hours')"
       ).run();
