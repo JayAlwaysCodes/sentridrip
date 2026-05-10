@@ -17,7 +17,10 @@
     "express": "^4.19.2",
     "express-rate-limit": "^8.3.2",
     "node-cron": "^3.0.3",
-    "node-telegram-bot-api": "^0.67.0"
+    "node-telegram-bot-api": "^0.67.0",
+    "@open-wallet-standard/core": "^1.2.4",
+    "@solana/web3.js": "^1.98.4",
+    "viem": "^2.0.0"
   },
   "engines": {
     "node": "20.x"
