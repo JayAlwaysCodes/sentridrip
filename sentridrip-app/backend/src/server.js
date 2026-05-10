@@ -41,6 +41,10 @@ app.use("/api/price", priceRouter);
 app.use("/api/swap", swapRouter);
 app.use("/api/pnl", pnlRouter);
 
+app.get("/ping", (req, res) => {
+  res.status(200).send("pong");
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", name: "SentriDrip", version: "1.0.0" });
 });
