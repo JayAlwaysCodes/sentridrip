@@ -14,13 +14,16 @@ const ZERION_CLI = join(__dirname, "../../../../cli/zerion.js");
 
 const router = Router();
 
+import { getSolanaPortfolio } from "../utils/solanaPortfolio.js"; 
+
 async function getWalletUsdcBalance(walletName) {
   try {
-    const { stdout, stderr } = await execFileAsync(
+    // Try Zerion first (positions command)
+    const { stdout } = await execFileAsync(
       "node",
       [ZERION_CLI, "positions", "--wallet", walletName, "--chain", "solana", "--json"],
       {
-        timeout: 15_000,
+        timeout: 12_000,
         env: {
           ...process.env,
           ZERION_API_KEY: process.env.ZERION_API_KEY,
@@ -30,46 +33,50 @@ async function getWalletUsdcBalance(walletName) {
       }
     );
 
-    const raw = stdout.trim();
-    if (!raw) return { balance: 0, error: "No response from wallet" };
+    const parsed = JSON.parse(stdout.trim());
+    if (!parsed.error) {
+      const positions = parsed.data || parsed || [];
+      const usdc = positions.find((p) => {
+        const attr = p.attributes || p;
+        const symbol = attr.fungible_info?.symbol || attr.symbol || "";
+        return symbol.toUpperCase() === "USDC";
+      });
 
-    const parsed = JSON.parse(raw);
-
-    // Check if CLI returned an error
-    if (parsed.error) {
-      return { balance: 0, error: parsed.error.message || "Could not fetch wallet balance" };
+      const balance = usdc 
+        ? parseFloat((usdc.attributes || usdc).quantity?.float || 0) 
+        : 0;
+      
+      return { balance, error: null, source: "zerion" };
     }
-
-    const positions = parsed.data || parsed || [];
-
-    // Empty positions means wallet exists but has no tokens
-    if (!Array.isArray(positions) || positions.length === 0) {
-      return { balance: 0, error: null };
-    }
-
-    const usdc = positions.find((p) => {
-      const attr = p.attributes || p;
-      const symbol = attr.fungible_info?.symbol || attr.symbol || "";
-      return symbol.toUpperCase() === "USDC";
-    });
-
-    if (!usdc) return { balance: 0, error: null };
-
-    const attr = usdc.attributes || usdc;
-    const balance = parseFloat(attr.quantity?.float || 0);
-    return { balance, error: null };
   } catch (err) {
-    // If stdout has JSON error, extract it
-    try {
-      const match = (err.stdout || "").match(/\{[\s\S]*\}/);
-      if (match) {
-        const parsed = JSON.parse(match[0]);
-        if (parsed.error) {
-          return { balance: 0, error: parsed.error.message || "Wallet fetch failed" };
-        }
-      }
-    } catch (_) {}
-    return { balance: 0, error: "Could not connect to wallet. Check your API key and wallet name." };
+    console.warn("[Balance Check] Zerion failed, using RPC fallback");
+  }
+
+  // ==================== FALLBACK ====================
+  try {
+    const fallback = await getSolanaPortfolio(walletName);  // reuse our RPC function
+    const positions = fallback.data?.positions || [];
+
+    const usdc = positions.find(p => p.symbol?.toUpperCase() === "USDC");
+    const sol = positions.find(p => p.symbol === "SOL");
+
+    const usdcBalance = usdc ? parseFloat(usdc.amount || 0) : 0;
+    const solBalance = sol ? parseFloat(sol.amount || 0) : 0;
+
+    console.log(`[RPC Fallback] USDC: $${usdcBalance} | SOL: ${solBalance}`);
+
+    return { 
+      balance: usdcBalance, 
+      error: null, 
+      source: "solana-rpc",
+      solBalance 
+    };
+  } catch (rpcErr) {
+    console.error("[Balance Check] RPC also failed:", rpcErr.message);
+    return { 
+      balance: 0, 
+      error: "Could not connect to wallet. Please try again in a minute." 
+    };
   }
 }
 

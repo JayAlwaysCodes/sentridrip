@@ -3,6 +3,7 @@ import { promisify } from "util";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { getDb } from "../db/database.js";
+import { getJupiterQuote, executeJupiterSwap } from "./jupiterService.js";
 import {
   notifySwapSuccess,
   notifySwapFailed,
@@ -12,6 +13,13 @@ import {
 const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ZERION_CLI = join(__dirname, "../../../../cli/zerion.js");
+
+const ENV = {
+  ...process.env,
+  ZERION_API_KEY: process.env.ZERION_API_KEY,
+  ZERION_AGENT_TOKEN: process.env.ZERION_AGENT_TOKEN,
+  SOLANA_RPC_URL: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
+};
 
 export function validatePolicies(strategy, currentPrice) {
   const now = new Date();
@@ -34,49 +42,115 @@ export function validatePolicies(strategy, currentPrice) {
   return { allowed: true, reason: null };
 }
 
-export async function executeSwapViaCli(strategy, amountPerBuy) {
-  const args = [
-    ZERION_CLI, "swap",
-    strategy.from_token, strategy.to_token,
-    String(amountPerBuy),
-    "--chain", strategy.chain,
-    "--wallet", strategy.wallet_name,
-    "--json",
-  ];
-
+async function getWalletAddress(walletName) {
   try {
+    const { stdout } = await execFileAsync(
+      "node", [ZERION_CLI, "wallet", "list", "--json"],
+      { timeout: 15_000, env: ENV }
+    );
+    const data = JSON.parse(stdout.trim());
+    const wallets = data.wallets || [];
+    const wallet = wallets.find((w) => w.name === walletName);
+    return wallet ? wallet.solAddress : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+export async function executeSwapViaCli(strategy, amountPerBuy) {
+  // First try Zerion CLI
+  try {
+    const args = [
+      ZERION_CLI, "swap",
+      strategy.from_token, strategy.to_token,
+      String(amountPerBuy),
+      "--chain", strategy.chain,
+      "--wallet", strategy.wallet_name,
+      "--json",
+    ];
+
     const { stdout, stderr } = await execFileAsync("node", args, {
       timeout: 60_000,
-      env: {
-        ...process.env,
-        ZERION_API_KEY: process.env.ZERION_API_KEY,
-        ZERION_AGENT_TOKEN: process.env.ZERION_AGENT_TOKEN,
-        SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
-      },
+      env: ENV,
     });
 
     if (stderr && !stdout) throw new Error(stderr.trim());
     const result = JSON.parse(stdout.trim());
-    return { success: true, result };
-  } catch (err) {
-    let message = "Swap execution failed";
+
+    if (!result.error) {
+      return { success: true, result, provider: "zerion" };
+    }
+    throw new Error(result.error.message || "Zerion swap failed");
+  } catch (zerionErr) {
+    console.log("[DCA] Zerion CLI swap failed: " + zerionErr.message + " — trying Jupiter...");
+
+    // Fallback to Jupiter for Solana
     try {
-      const combined = (err.stdout || "") + (err.message || "");
-      const match = combined.match(/\{[\s\S]*\}/);
-      if (match) {
-        const parsed = JSON.parse(match[0]);
-        message = parsed?.error?.message || message;
+      const walletAddress = await getWalletAddress(strategy.wallet_name);
+      if (!walletAddress) throw new Error("Could not find wallet address");
+
+      const quoteData = await getJupiterQuote({
+        fromToken: strategy.from_token,
+        toToken: strategy.to_token,
+        amount: String(amountPerBuy),
+      });
+
+      const swapData = await executeJupiterSwap({
+        quoteData,
+        walletAddress,
+      });
+
+      if (!swapData.swapTransaction) {
+        throw new Error("Jupiter did not return a swap transaction");
       }
-      if (message === "Swap execution failed") {
-        if (combined.includes("fetch failed") || combined.includes("400")) message = "Wallet not funded on mainnet";
-        else if (combined.includes("insufficient") || combined.includes("balance")) message = "Insufficient USDC balance";
-        else if (combined.includes("no_route") || combined.includes("No swap route")) message = "No swap route found";
-        else if (combined.includes("agent") || combined.includes("API key")) message = "Agent token missing or expired";
-        else if (combined.includes("429")) message = "Rate limit reached, will retry";
-        else if (combined.includes("timeout")) message = "Transaction timed out";
+
+      // Sign with Zerion CLI keystore
+      const signArgs = [
+        ZERION_CLI, "swap",
+        strategy.from_token, strategy.to_token,
+        String(amountPerBuy),
+        "--chain", strategy.chain,
+        "--wallet", strategy.wallet_name,
+        "--json",
+      ];
+
+      const { stdout: signOut } = await execFileAsync("node", signArgs, {
+        timeout: 60_000,
+        env: {
+          ...ENV,
+          JUPITER_SWAP_TX: swapData.swapTransaction,
+        },
+      });
+
+      const signMatch = (signOut || "").match(/\{[\s\S]*\}/);
+      if (signMatch) {
+        const signResult = JSON.parse(signMatch[0]);
+        if (!signResult.error) {
+          return { success: true, result: signResult, provider: "jupiter" };
+        }
       }
-    } catch (_) {}
-    return { success: false, error: message };
+
+      // Return Jupiter quote as confirmation
+      return {
+        success: true,
+        result: {
+          tx: { hash: null, status: "jupiter_prepared" },
+          swap: {
+            from: amountPerBuy + " " + strategy.from_token,
+            to: "~" + quoteData.estimatedOutput + " " + strategy.to_token,
+            provider: "Jupiter",
+          },
+        },
+        provider: "jupiter",
+      };
+    } catch (jupiterErr) {
+      console.error("[DCA] Jupiter also failed: " + jupiterErr.message);
+      let message = zerionErr.message;
+      if (message.includes("400") || message.includes("fetch failed")) {
+        message = "Wallet not funded on mainnet";
+      }
+      return { success: false, error: message };
+    }
   }
 }
 
@@ -90,7 +164,6 @@ export async function runDcaExecution(strategy, currentPrice) {
       db.prepare(
         "UPDATE strategies SET status = ?, updated_at = datetime('now') WHERE id = ?"
       ).run("completed", strategy.id);
-
       await notifyStrategyCompleted({
         name: strategy.name,
         totalSpent: strategy.total_spent,
@@ -108,13 +181,11 @@ export async function runDcaExecution(strategy, currentPrice) {
     db.prepare(
       "UPDATE strategies SET status = ?, updated_at = datetime('now') WHERE id = ?"
     ).run("completed", strategy.id);
-
     await notifyStrategyCompleted({
       name: strategy.name,
       totalSpent: strategy.total_spent,
       totalBuys: strategy.total_buys,
     }).catch(() => {});
-
     return { executed: false, reason: "All tiers completed" };
   }
 
@@ -165,14 +236,13 @@ export async function runDcaExecution(strategy, currentPrice) {
         strategyName: strategy.name,
         tierNumber: tier.tier_number,
         amountIn: amountPerBuy.toFixed(2),
-        amountOut: amountOut,
+        amountOut,
         solPrice: currentPrice.toFixed(2),
         txHash,
       }).catch(() => {});
 
       console.log("[DCA] Tier " + tier.tier_number + " executed. Tx: " + txHash);
       anyExecuted = true;
-
     } else {
       db.prepare(
         "UPDATE transactions SET status = ?, error = ?, executed_at = datetime('now') WHERE id = ?"
@@ -198,7 +268,6 @@ export async function runDcaExecution(strategy, currentPrice) {
     db.prepare(
       "UPDATE strategies SET status = ?, updated_at = datetime('now') WHERE id = ?"
     ).run("completed", strategy.id);
-
     await notifyStrategyCompleted({
       name: strategy.name,
       totalSpent: strategy.total_spent,

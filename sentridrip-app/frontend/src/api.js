@@ -31,5 +31,8 @@ export const walletApi = {
   portfolio: (wallet) => api.get("/wallet/portfolio/" + wallet),
   positions: (wallet) => api.get("/wallet/positions/" + wallet),
   info: (wallet) => api.get("/wallet/info/" + wallet),
+  swap: {
+    execute: (data) => api.post("/swap/execute", data)
+  },
   send: (data) => api.post("/wallet/send", data),
 };

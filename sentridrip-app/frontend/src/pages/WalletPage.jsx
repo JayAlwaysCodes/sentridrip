@@ -283,99 +283,109 @@ function CreateWalletModal({ onClose, onCreated }) {
 
 function PortfolioPanel({ walletName, solAddr }) {
   const [portfolio, setPortfolio] = useState(null);
-  const [positions, setPositions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    setLoading(true);
-    setPortfolio(null);
-    setPositions([]);
-    Promise.all([walletApi.portfolio(walletName), walletApi.positions(walletName)])
-      .then(([portRes, posRes]) => {
-        setPortfolio(portRes.data.data);
-        const pd = posRes.data.data;
-        setPositions(pd.data || pd || []);
-      })
-      .catch(() => setPortfolio(null))
-      .finally(() => setLoading(false));
+    const fetchPortfolio = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await walletApi.portfolio(walletName);
+        
+        if (res.data.success) {
+          setPortfolio(res.data.data);
+        } else {
+          throw new Error(res.data.error);
+        }
+      } catch (err) {
+        console.error("Portfolio fetch failed:", err);
+        setError(err.message || "Failed to load portfolio");
+        setPortfolio(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPortfolio();
   }, [walletName]);
+
+  // Helper to safely get positions
+  const positions = portfolio?.positions || 
+                   (portfolio?.data?.positions) || 
+                   (Array.isArray(portfolio) ? portfolio : []);
+
+  const totalValue = portfolio?.portfolio?.total || 
+                    portfolio?.total_value || 
+                    positions.reduce((sum, p) => {
+                      const val = p.value || p.amount * 145 || 0;
+                      return sum + val;
+                    }, 0);
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
       <h2 className="font-semibold mb-4 text-sm text-gray-400 uppercase tracking-wider">Solana Portfolio</h2>
+
       {loading && (
         <div className="flex items-center gap-2 text-gray-400 text-sm">
           <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-          Loading...
+          Loading portfolio...
         </div>
       )}
+
       {!loading && portfolio && (
-        <div className="space-y-3">
-          {portfolio.portfolio && portfolio.portfolio.total != null && (
-            <div className="bg-gray-800 rounded-lg p-3">
-              <p className="text-xs text-gray-500">Total Value</p>
-              <p className="text-2xl font-bold mt-0.5">{"$" + parseFloat(portfolio.portfolio.total).toFixed(2)}</p>
-            </div>
-          )}
-          {positions.length > 0 && (
+        <div className="space-y-4">
+          {/* Total Value */}
+          <div className="bg-gray-800 rounded-lg p-4">
+            <p className="text-xs text-gray-500">Total Value</p>
+            <p className="text-3xl font-bold mt-1">
+              ${parseFloat(totalValue).toFixed(2)}
+            </p>
+            {portfolio.source === "solana-rpc" && (
+              <p className="text-xs text-amber-400 mt-1">• Using direct Solana RPC (Zerion limited)</p>
+            )}
+          </div>
+
+          {/* Positions */}
+          {positions.length > 0 ? (
             <div className="space-y-2">
               {positions.slice(0, 8).map((p, i) => {
-                const attr = p.attributes || p;
-                const symbol = attr.fungible_info ? attr.fungible_info.symbol : "Unknown";
-                const value = attr.value != null ? "$" + parseFloat(attr.value).toFixed(2) : "N/A";
-                const qty = attr.quantity && attr.quantity.float != null ? parseFloat(attr.quantity.float).toFixed(4) : "0";
-                const change = attr.changes ? attr.changes.percent_1d : null;
-                const changePos = change != null && change >= 0;
-                const changeText = change != null ? (changePos ? "+" : "") + change.toFixed(2) + "%" : null;
+                const symbol = p.symbol || p.asset || "SOL";
+                const amount = p.amount || p.quantity?.float || 0;
+                const value = p.value || (amount * 145); // fallback price
+
                 return (
-                  <div key={i} className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center text-xs font-bold">
-                        {symbol.slice(0, 1)}
+                  <div key={i} className="flex justify-between items-center p-4 bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center text-sm font-bold">
+                        {symbol[0]}
                       </div>
-                      <span className="font-medium">{symbol}</span>
+                      <div>
+                        <p className="font-medium">{symbol}</p>
+                        <p className="text-xs text-gray-500">{amount.toFixed(6)}</p>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">{value}</p>
-                      <div className="flex items-center gap-2 justify-end">
-                        <p className="text-xs text-gray-500">{qty + " " + symbol}</p>
-                        {changeText && (
-                          <p className={"text-xs font-medium " + (changePos ? "text-green-400" : "text-red-400")}>{changeText}</p>
-                        )}
-                      </div>
+                      <p className="font-semibold">${parseFloat(value).toFixed(2)}</p>
                     </div>
                   </div>
                 );
               })}
             </div>
+          ) : (
+            <p className="text-gray-500 text-sm py-4">No positions found</p>
           )}
-          {positions.length === 0 && <p className="text-gray-500 text-sm">No Solana positions yet.</p>}
         </div>
       )}
+
       {!loading && !portfolio && (
-        <div className="text-center py-6 space-y-2">
-          <p className="text-gray-400 text-sm font-medium">Wallet not funded on mainnet yet</p>
-          <p className="text-gray-600 text-xs">Send SOL and USDC to your Solana address to get started</p>
+        <div className="text-center py-10 space-y-3">
+          <p className="text-gray-400">Wallet not funded on mainnet yet</p>
           {solAddr && (
-            <div className="mt-3 space-y-2">
-              <div className="bg-gray-800 rounded-lg p-3 text-left">
-                <p className="text-xs text-gray-500 mb-1">Solana Deposit Address</p>
-                <p className="text-xs text-gray-600 mb-2">Same address accepts both SOL and USDC (SPL)</p>
-                <div className="flex items-center gap-2">
-                  <p className="font-mono text-xs text-cyan-400 break-all flex-1">{solAddr}</p>
-                  <CopyButton text={solAddr} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-2 text-center">
-                  <p className="text-xs text-gray-500">Deposit SOL</p>
-                  <p className="text-xs text-white mt-0.5">Send SOL on Solana network</p>
-                </div>
-                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-2 text-center">
-                  <p className="text-xs text-gray-500">Deposit USDC</p>
-                  <p className="text-xs text-white mt-0.5">Send USDC (SPL) on Solana network</p>
-                </div>
-              </div>
+            <div className="mt-4 bg-gray-800 rounded-lg p-4 text-left">
+              <p className="text-xs text-gray-500 mb-2">Deposit Address</p>
+              <p className="font-mono text-xs text-cyan-400 break-all">{solAddr}</p>
             </div>
           )}
         </div>

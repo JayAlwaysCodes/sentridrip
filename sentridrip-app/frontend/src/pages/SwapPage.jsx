@@ -1,15 +1,43 @@
-import { useState } from "react";
-import axios from "axios";
+import { useState, useEffect } from "react";
+import { walletApi } from "../api";
 
-const api = axios.create({ baseURL: "/api" });
-
-export default function SwapPage({ activeWallet, solPrice }) {
-  const [fromToken, setFromToken] = useState("USDC");
-  const [toToken, setToToken] = useState("SOL");
+export default function SwapPage({ activeWallet, solPrice, onSwapSuccess }) {
+  const [fromToken, setFromToken] = useState("SOL");
+  const [toToken, setToToken] = useState("USDC");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [balances, setBalances] = useState({ SOL: 0, USDC: 0 });
+
+  useEffect(() => {
+    const loadBalances = async () => {
+      if (!activeWallet?.name) return;
+      try {
+        const res = await walletApi.portfolio(activeWallet.name);
+        if (res.data.success) {
+          const data = res.data.data;
+          const positions = data?.positions || data?.data?.positions || data || [];
+
+          let sol = 0, usdc = 0;
+          positions.forEach(p => {
+            const symbol = (p.symbol || p.fungible_info?.symbol || "").toUpperCase();
+            const qty = p.quantity?.float || p.amount || 0;
+            if (symbol === "SOL") sol = Number(qty).toFixed(6);
+            if (symbol === "USDC") usdc = Number(qty).toFixed(2);
+          });
+          setBalances({ SOL: sol, USDC: usdc });
+        }
+      } catch (e) {
+        console.error("Balance load failed", e);
+      }
+    };
+    loadBalances();
+  }, [activeWallet]);
+
+  const currentBalance = Number(balances[fromToken]) || 0;
+  const enteredAmount = parseFloat(amount) || 0;
+  const isInsufficient = enteredAmount > currentBalance;
 
   const handleFlip = () => {
     setFromToken(toToken);
@@ -20,198 +48,169 @@ export default function SwapPage({ activeWallet, solPrice }) {
   };
 
   const estimatedOutput = () => {
-    if (!amount || !solPrice) return null;
+    if (!amount || !solPrice) return "—";
     const amt = parseFloat(amount);
-    if (isNaN(amt)) return null;
-    if (fromToken === "USDC" && toToken === "SOL") {
-      return (amt / solPrice).toFixed(6) + " SOL";
-    }
-    if (fromToken === "SOL" && toToken === "USDC") {
-      return "$" + (amt * solPrice).toFixed(2) + " USDC";
-    }
-    return null;
-  };
-
-  const friendlyError = (raw) => {
-    if (!raw) return "Something went wrong. Please try again.";
-    const msg = raw.toLowerCase();
-    if (msg.includes("network error") || msg.includes("fetch failed")) {
-      return "Network error reaching Zerion API. Check your connection and try again.";
-    }
-    if (msg.includes("no mainnet funds") || msg.includes("400")) {
-      return "Your wallet has no mainnet " + fromToken + " to swap. Please fund your Solana address first.";
-    }
-    if (msg.includes("insufficient balance") || msg.includes("insufficient")) {
-      return "Insufficient " + fromToken + " balance. Fund your wallet before swapping.";
-    }
-    if (msg.includes("no swap route") || msg.includes("no_route")) {
-      return "No swap route found. Try a larger amount — minimum is usually $1 worth.";
-    }
-    if (msg.includes("agent token") || msg.includes("api key")) {
-      return "Agent token missing or expired. Re-create it with: zerion agent create-token";
-    }
-    if (msg.includes("rate limit") || msg.includes("429")) {
-      return "Rate limit reached. Please wait 30 seconds and try again.";
-    }
-    if (msg.includes("timeout")) {
-      return "Swap timed out. Check Solscan for your wallet address to see if it went through.";
-    }
-    if (msg.includes("passphrase") || msg.includes("decrypt")) {
-      return "Wallet authentication failed. Check your agent token configuration.";
-    }
-    return raw.length > 120 ? raw.slice(0, 120) + "..." : raw;
+    if (isNaN(amt)) return "—";
+    return fromToken === "USDC"
+      ? (amt / solPrice).toFixed(6) + " SOL"
+      : "$" + (amt * solPrice).toFixed(2) + " USDC";
   };
 
   const handleSwap = async (e) => {
     e.preventDefault();
-    if (!activeWallet) {
-      setError("No wallet selected. Go to Wallets and select one.");
-      return;
-    }
+    if (!activeWallet) return setError("No wallet selected");
+    if (enteredAmount <= 0) return setError("Enter amount");
+
     setLoading(true);
     setError(null);
     setResult(null);
+
     try {
-      const res = await api.post("/swap/execute", {
+      const res = await walletApi.swap.execute({
         fromToken,
         toToken,
-        amount,
+        amount: enteredAmount,
         walletName: activeWallet.name,
         chain: "solana",
       });
-      setResult(res.data.data);
+
+      setResult(res.data);
+      setAmount("");
+      if (onSwapSuccess) onSwapSuccess();
     } catch (e) {
-      const raw = e.response?.data?.error || e.message || "";
-      setError(friendlyError(raw));
+      let msg = e.response?.data?.error || e.message || "Swap failed";
+      if (msg.includes("unfunded") || msg.includes("400")) {
+        msg = "Wallet has balance but Zerion CLI can't detect it yet. Try again in 10 seconds or fund with more SOL.";
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const estimate = estimatedOutput();
+  const fromColor = fromToken === "SOL" ? "bg-blue-600" : "bg-green-600";
+  const toColor = toToken === "USDC" ? "bg-purple-600" : "bg-blue-600";
+  const fromLetter = fromToken === "SOL" ? "S" : "U";
+  const toLetter = toToken === "USDC" ? "U" : "S";
 
   return (
     <div className="max-w-md mx-auto">
+      {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Swap</h1>
         <p className="text-gray-400 text-sm mt-1">Instantly swap SOL and USDC via Zerion</p>
       </div>
 
-      {!activeWallet && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-400 mb-4">
-          No wallet selected. Go to Wallets tab and select a wallet first.
-        </div>
-      )}
-
+      {/* Active wallet badge */}
       {activeWallet && (
-        <div className="bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-400 mb-4 flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-purple-400" />
-          <span>Using wallet:</span>
-          <span className="text-white font-medium">{activeWallet.name}</span>
-          {activeWallet.solAddress && (
-            <span className="font-mono text-xs text-gray-500 ml-auto">
-              {activeWallet.solAddress.slice(0, 6)}...{activeWallet.solAddress.slice(-4)}
-            </span>
-          )}
+        <div className="mb-6 bg-gray-800/50 border border-gray-700 rounded-2xl px-5 py-3 flex items-center gap-3">
+          <div className="w-2 h-2 bg-purple-500 rounded-full shrink-0" />
+          <span className="text-gray-400">Using wallet:</span>
+          <span className="font-medium">{activeWallet.name}</span>
         </div>
       )}
 
-      <form onSubmit={handleSwap} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
-        <div className="bg-gray-800 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs text-gray-500">From</label>
-            <span className="text-xs text-gray-500">
-              {fromToken === "USDC" ? "USDC" : "SOL"}
+      <form onSubmit={handleSwap} className="bg-gray-900 border border-gray-700 rounded-3xl p-6 space-y-4">
+
+        {/* FROM */}
+        <div>
+          <div className="flex justify-between mb-2 px-1">
+            <span className="text-gray-400 text-sm">From</span>
+            <span className="text-gray-400 text-sm">
+              Balance:{" "}
+              <span className={`font-medium ${isInsufficient ? "text-red-400" : "text-white"}`}>
+                {currentBalance}
+              </span>{" "}
+              {fromToken}
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold shrink-0">
-              {fromToken.slice(0, 1)}
+          <div className="bg-gray-800 rounded-2xl p-4 flex items-center gap-3 border border-gray-700 w-full overflow-hidden">
+            <div className={`w-11 h-11 rounded-full ${fromColor} flex items-center justify-center text-lg font-bold shrink-0`}>
+              {fromLetter}
             </div>
             <input
               type="number"
               step="0.000001"
-              min="0.01"
-              placeholder="0.00"
+              min="0"
               value={amount}
-              onChange={(e) => { setAmount(e.target.value); setResult(null); setError(null); }}
-              required
-              className="flex-1 min-w-0 bg-transparent text-2xl font-bold focus:outline-none placeholder-gray-600"
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              className="flex-1 min-w-0 bg-transparent text-3xl font-bold focus:outline-none placeholder-gray-600"
             />
-            <span className="text-gray-300 font-semibold shrink-0">{fromToken}</span>
+            <span className="text-xl font-semibold text-gray-200 shrink-0">{fromToken}</span>
           </div>
+          {isInsufficient && enteredAmount > 0 && (
+            <p className="text-red-400 text-xs mt-1 px-1">Insufficient balance</p>
+          )}
         </div>
 
+        {/* FLIP BUTTON */}
         <div className="flex justify-center">
           <button
             type="button"
             onClick={handleFlip}
-            className="w-10 h-10 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full flex items-center justify-center transition-colors text-gray-400 hover:text-white"
+            className="w-11 h-11 bg-gray-800 border-2 border-gray-700 rounded-full flex items-center justify-center text-xl hover:bg-gray-700 hover:border-gray-500 transition-colors"
+            title="Flip tokens"
           >
             ↕
           </button>
         </div>
 
-        <div className="bg-gray-800 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs text-gray-500">To (estimated)</label>
-            <span className="text-xs text-gray-500">{toToken}</span>
+        {/* TO */}
+        <div>
+          <div className="flex justify-between mb-2 px-1">
+            <span className="text-gray-400 text-sm">To (estimated)</span>
+            <span className="text-gray-400 text-sm">{toToken}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-cyan-400 flex items-center justify-center text-xs font-bold shrink-0">
-              {toToken.slice(0, 1)}
+          <div className="bg-gray-800 rounded-2xl p-4 flex items-center gap-3 border border-gray-700 w-full overflow-hidden">
+            <div className={`w-11 h-11 rounded-full ${toColor} flex items-center justify-center text-lg font-bold shrink-0`}>
+              {toLetter}
             </div>
-            <p className="flex-1 min-w-0 text-2xl font-bold text-gray-400 truncate">
-              {estimate || "—"}
-            </p>
-            <span className="text-gray-300 font-semibold shrink-0">{toToken}</span>
+            <div className="flex-1 min-w-0 text-3xl font-bold text-gray-400 truncate">
+              {estimatedOutput()}
+            </div>
+            <span className="text-xl font-semibold text-gray-200 shrink-0">{toToken}</span>
           </div>
         </div>
 
+        {/* Rate */}
         {solPrice && (
-          <div className="flex justify-between text-xs text-gray-500 px-1">
-            <span>Rate</span>
-            <span>1 SOL = ${solPrice.toFixed(2)} USDC</span>
+          <div className="text-center text-xs text-gray-500 py-1">
+            1 SOL ≈ ${solPrice.toFixed(2)} USDC
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2 px-1">
-          {["🔒 Solana only", "🛡️ Policy enforced", "⚡ Via Zerion API"].map((p) => (
-            <span key={p} className="text-xs bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full px-2 py-0.5">
-              {p}
-            </span>
-          ))}
-        </div>
-
+        {/* Error */}
         {error && (
-          <div className="bg-red-900/30 border border-red-700 rounded-xl p-3 text-red-400 text-sm">
+          <div className="bg-red-900/70 border border-red-700 text-red-300 p-4 rounded-2xl text-sm">
             {error}
           </div>
         )}
 
+        {/* Success */}
         {result && (
-          <div className="bg-green-900/30 border border-green-700 rounded-xl p-4 space-y-2">
-            <p className="text-green-400 font-semibold text-sm">Swap Executed!</p>
-            {result.swap && (
-              <p className="text-sm text-gray-300">{result.swap.from} → {result.swap.to}</p>
-            )}
-            {result.tx && result.tx.hash && (
-              <button
-                onClick={() => window.open("https://solscan.io/tx/" + result.tx.hash, "_blank")}
-                className="text-xs text-cyan-400 hover:underline font-mono"
-              >
-                {result.tx.hash.slice(0, 16)}... View on Solscan
-              </button>
-            )}
+          <div className="bg-green-900/50 border border-green-700 text-green-300 p-4 rounded-2xl text-sm">
+            ✓ Swap successful!
           </div>
         )}
 
+        {/* Submit */}
         <button
           type="submit"
-          disabled={loading || !activeWallet || !amount}
-          className="w-full bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-bold py-3.5 rounded-xl transition-colors text-sm"
+          disabled={loading || enteredAmount <= 0 || isInsufficient}
+          className="w-full bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed font-bold py-4 rounded-2xl text-lg transition-colors"
         >
-          {loading ? "Executing swap..." : "Swap " + fromToken + " → " + toToken}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              Swapping...
+            </span>
+          ) : (
+            `Swap ${fromToken} → ${toToken}`
+          )}
         </button>
       </form>
     </div>
